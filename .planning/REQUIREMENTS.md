@@ -9,8 +9,8 @@ Requirements for initial release (v0.1 MVP). Each maps to roadmap phases.
 
 ### HTTP API
 
-- [ ] **API-01**: Service accepts HTTP POST to `/api/v1/notify` with JSON payload (title, body, channel, priority, tags, metadata)
-- [ ] **API-02**: Service authenticates requests via Bearer token with `sk-` prefix API keys
+- [x] **API-01**: Service accepts HTTP POST to `/api/v1/notify` with JSON payload (title, body, channel, priority, tags, metadata)
+- [x] **API-02**: Service authenticates requests via Bearer token with `sk-` prefix API keys
 - [ ] **API-03**: Service returns 202 with message ID on success, 400 on invalid payload, 401 on bad auth
 - [ ] **API-04**: Service exposes `GET /api/v1/health` returning 200 when operational
 
@@ -23,7 +23,7 @@ Requirements for initial release (v0.1 MVP). Each maps to roadmap phases.
 
 ### Telegram
 
-- [ ] **TELE-01**: Service delivers messages to configured Telegram chat via Bot API
+- [x] **TELE-01**: Service delivers messages to configured Telegram chat via Bot API
 - [ ] **TELE-02**: Service formats messages with MarkdownV2 (priority emoji, bold title, code blocks, proper escaping)
 - [ ] **TELE-03**: Service retries failed deliveries with exponential backoff, respecting Telegram 429 `retry_after`
 
@@ -92,15 +92,15 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| API-01 | Phase 2 | Pending |
-| API-02 | Phase 2 | Pending |
+| API-01 | Phase 2 | Complete |
+| API-02 | Phase 2 | Complete |
 | API-03 | Phase 2 | Pending |
 | API-04 | Phase 2 | Pending |
 | PERS-01 | Phase 1 | Complete (01-02) |
 | PERS-02 | Phase 1 | Complete (01-02) |
 | PERS-03 | Phase 1 | Complete (01-02) |
 | PERS-04 | Phase 1 | Complete (01-02) |
-| TELE-01 | Phase 2 | Pending |
+| TELE-01 | Phase 2 | Complete |
 | TELE-02 | Phase 2 | Pending |
 | TELE-03 | Phase 2 | Pending |
 | CLI-01 | Phase 3 | Pending |

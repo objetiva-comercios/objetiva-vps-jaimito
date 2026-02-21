@@ -5,22 +5,22 @@
 See: .planning/PROJECT.md (updated 2026-02-20)
 
 **Core value:** Every event that happens on the VPS gets reliably captured and delivered to Telegram — no notification is ever lost silently.
-**Current focus:** Phase 1 — Foundation
+**Current focus:** Phase 2 — Core Pipeline
 
 ## Current Position
 
-Phase: 1 of 3 (Foundation)
-Plan: 3 of 3 in current phase
-Status: Phase complete
-Last activity: 2026-02-21 — Plan 01-03 complete: Telegram validation, systemd unit, full startup sequence
+Phase: 2 of 3 (Core Pipeline)
+Plan: 1 of 3 in current phase
+Status: Plan complete
+Last activity: 2026-02-21 — Plan 02-01 complete: config extension, schema migration 002, message queue CRUD, API key operations
 
-Progress: [███░░░░░░░] 33%
+Progress: [████░░░░░░] 44%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
-- Average duration: 5 min
+- Total plans completed: 4
+- Average duration: 4 min
 - Total execution time: 0.3 hours
 
 **By Phase:**
@@ -28,9 +28,10 @@ Progress: [███░░░░░░░] 33%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-foundation | 3/3 | 16 min | 5 min |
+| 02-core-pipeline | 1/3 | 3 min | 3 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (6 min), 01-02 (8 min), 01-03 (2 min)
+- Last 5 plans: 01-01 (6 min), 01-02 (8 min), 01-03 (2 min), 02-01 (3 min)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -55,6 +56,10 @@ Recent decisions affecting current work:
 - [01-03]: GetChatParams.ChatID is type `any` in go-telegram/bot v1.19.0 — int64 passed directly without conversion
 - [01-03]: Chat deduplication stores map[int64]string (chatID -> channel name) for error messages naming unreachable channel
 - [01-03]: cleanup.Start internally spawns goroutine — main goroutine just waits on <-ctx.Done()
+- [02-01]: server.listen defaults to 127.0.0.1:8080 (localhost-only) for VPS security — not 0.0.0.0
+- [02-01]: HashToken exported at package level — shared between SeedKeys and auth middleware to prevent divergence
+- [02-01]: SeedKeys uses INSERT OR IGNORE — idempotent, safe on every startup
+- [02-01]: SeedKeys logs key name at Info level only — raw key value never logged
 
 ### Pending Todos
 
@@ -67,5 +72,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-21
-Stopped at: Completed 01-03-PLAN.md — Telegram validation, systemd unit, full startup sequence
+Stopped at: Completed 02-01-PLAN.md — config extension, schema migration 002, message queue CRUD, API key DB operations
 Resume file: None
