@@ -12,7 +12,7 @@ jaimito ships in three phases that follow the natural data flow of the product: 
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Foundation** - Project scaffold, YAML config, SQLite persistence layer, and systemd unit
+- [x] **Phase 1: Foundation** - Project scaffold, YAML config, SQLite persistence layer, and systemd unit
 - [ ] **Phase 2: Core Pipeline** - HTTP ingest endpoint with auth, Telegram dispatcher with retry — the product is alive
 - [ ] **Phase 3: CLI and Developer Experience** - `jaimito send`, `jaimito wrap`, and `jaimito keys` completing the full user-facing surface
 
@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 Plans:
 - [x] 01-01-PLAN.md — Go module scaffold and YAML config package
 - [x] 01-02-PLAN.md — SQLite persistence layer with schema, reclaim, and cleanup
-- [ ] 01-03-PLAN.md — Telegram validation, main.go wiring, and systemd unit
+- [x] 01-03-PLAN.md — Telegram validation, main.go wiring, and systemd unit
 
 ### Phase 2: Core Pipeline
 **Goal**: A running service that accepts authenticated HTTP notifications, queues them durably, and delivers them to Telegram with correct formatting and automatic retry
@@ -64,6 +64,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 2/3 | In progress | - |
+| 1. Foundation | 3/3 | Complete | 2026-02-21 |
 | 2. Core Pipeline | 0/TBD | Not started | - |
 | 3. CLI and Developer Experience | 0/TBD | Not started | - |

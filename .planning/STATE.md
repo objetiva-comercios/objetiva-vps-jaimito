@@ -10,27 +10,27 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 ## Current Position
 
 Phase: 1 of 3 (Foundation)
-Plan: 2 of 3 in current phase
-Status: In progress
-Last activity: 2026-02-21 — Plan 01-02 complete: SQLite persistence layer + cleanup scheduler
+Plan: 3 of 3 in current phase
+Status: Phase complete
+Last activity: 2026-02-21 — Plan 01-03 complete: Telegram validation, systemd unit, full startup sequence
 
-Progress: [██░░░░░░░░] 22%
+Progress: [███░░░░░░░] 33%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2
-- Average duration: 7 min
-- Total execution time: 0.2 hours
+- Total plans completed: 3
+- Average duration: 5 min
+- Total execution time: 0.3 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-foundation | 2/3 | 14 min | 7 min |
+| 01-foundation | 3/3 | 16 min | 5 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (6 min), 01-02 (8 min)
+- Last 5 plans: 01-01 (6 min), 01-02 (8 min), 01-03 (2 min)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -52,6 +52,9 @@ Recent decisions affecting current work:
 - [01-02]: SetMaxOpenConns(1) is critical for SQLite single-writer model (prevents SQLITE_BUSY)
 - [01-02]: Cleanup scheduler runs immediately on startup then every interval (startup-then-interval)
 - [01-02]: dispatch_log must be deleted before messages in purge (FK constraint order)
+- [01-03]: GetChatParams.ChatID is type `any` in go-telegram/bot v1.19.0 — int64 passed directly without conversion
+- [01-03]: Chat deduplication stores map[int64]string (chatID -> channel name) for error messages naming unreachable channel
+- [01-03]: cleanup.Start internally spawns goroutine — main goroutine just waits on <-ctx.Done()
 
 ### Pending Todos
 
@@ -64,5 +67,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-21
-Stopped at: Completed 01-02-PLAN.md — SQLite persistence layer + cleanup scheduler
+Stopped at: Completed 01-03-PLAN.md — Telegram validation, systemd unit, full startup sequence
 Resume file: None
