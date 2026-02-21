@@ -1,0 +1,16 @@
+[Unit]
+Description=jaimito VPS notification hub
+After=network.target
+ConditionPathExists=/usr/local/bin/jaimito
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/jaimito
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=jaimito
+
+[Install]
+WantedBy=multi-user.target
