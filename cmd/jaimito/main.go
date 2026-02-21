@@ -2,16 +2,20 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/chiguire/jaimito/internal/api"
 	"github.com/chiguire/jaimito/internal/cleanup"
 	"github.com/chiguire/jaimito/internal/config"
 	"github.com/chiguire/jaimito/internal/db"
+	"github.com/chiguire/jaimito/internal/dispatcher"
 	"github.com/chiguire/jaimito/internal/telegram"
 )
 
@@ -75,13 +79,51 @@ func main() {
 		slog.Info("reclaimed stuck messages", "count", reclaimed)
 	}
 
-	// 10. Start cleanup scheduler — purges old messages in background goroutine.
+	// 10. Seed API keys — idempotent bootstrap from config seed_api_keys.
+	if len(cfg.SeedAPIKeys) > 0 {
+		if err := db.SeedKeys(ctx, database, cfg.SeedAPIKeys); err != nil {
+			slog.Error("failed to seed API keys", "error", err)
+			os.Exit(1)
+		}
+		slog.Info("API keys seeded", "count", len(cfg.SeedAPIKeys))
+	}
+
+	// 11. Start dispatcher — polls for queued messages every 1s, delivers via Telegram.
+	dispatcher.Start(ctx, database, tgBot, cfg)
+
+	// 12. Start cleanup scheduler — purges old messages in background goroutine.
 	cleanup.Start(ctx, database, 24*time.Hour)
 
-	// 11. Log ready state — all components initialized successfully.
-	slog.Info("jaimito started", "channels", len(cfg.Channels), "db", cfg.Database.Path)
+	// 13. Start HTTP server — serves API endpoints for notification ingestion.
+	router := api.NewRouter(database, cfg)
+	server := &http.Server{
+		Addr:         cfg.Server.Listen,
+		Handler:      router,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+	go func() {
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			slog.Error("HTTP server failed", "error", err)
+			os.Exit(1)
+		}
+	}()
 
-	// 12. Wait for shutdown signal — deferred database.Close() runs on return.
+	// 14. Log ready state — all components initialized successfully.
+	slog.Info("jaimito started",
+		"addr", cfg.Server.Listen,
+		"channels", len(cfg.Channels),
+		"db", cfg.Database.Path,
+	)
+
+	// 15. Wait for shutdown signal — graceful shutdown with 30s timeout.
 	<-ctx.Done()
 	slog.Info("shutting down")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		slog.Error("HTTP server shutdown error", "error", err)
+	}
 }
