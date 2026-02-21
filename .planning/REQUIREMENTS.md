@@ -35,8 +35,8 @@ Requirements for initial release (v0.1 MVP). Each maps to roadmap phases.
 
 ### Configuration
 
-- [ ] **CONF-01**: Service reads configuration from YAML file at `/etc/jaimito/config.yaml`
-- [ ] **CONF-02**: Service supports named channels (general, deploys, errors, cron, system, security, monitoring) with target routing
+- [x] **CONF-01**: Service reads configuration from YAML file at `/etc/jaimito/config.yaml`
+- [x] **CONF-02**: Service supports named channels (general, deploys, errors, cron, system, security, monitoring) with target routing
 - [ ] **CONF-03**: Service ships with a systemd unit file for Linux deployment
 
 ## v2 Requirements
@@ -106,8 +106,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CLI-01 | Phase 3 | Pending |
 | CLI-02 | Phase 3 | Pending |
 | CLI-03 | Phase 3 | Pending |
-| CONF-01 | Phase 1 | Pending |
-| CONF-02 | Phase 1 | Pending |
+| CONF-01 | Phase 1 | Complete (01-01) |
+| CONF-02 | Phase 1 | Complete (01-01) |
 | CONF-03 | Phase 1 | Pending |
 
 **Coverage:**
@@ -117,4 +117,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-21*
-*Last updated: 2026-02-21 after roadmap creation*
+*Last updated: 2026-02-21 after plan 01-01 completion (CONF-01, CONF-02 complete)*
