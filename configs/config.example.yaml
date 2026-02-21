@@ -1,0 +1,34 @@
+telegram:
+  token: "YOUR_BOT_TOKEN_HERE"
+
+database:
+  path: "/var/lib/jaimito/jaimito.db"
+
+channels:
+  - name: general
+    chat_id: 100000001
+    priority: normal
+
+  - name: deploys
+    chat_id: 100000002
+    priority: normal
+
+  - name: errors
+    chat_id: 100000003
+    priority: high
+
+  - name: cron
+    chat_id: 100000004
+    priority: low
+
+  - name: system
+    chat_id: 100000005
+    priority: normal
+
+  - name: security
+    chat_id: 100000006
+    priority: high
+
+  - name: monitoring
+    chat_id: 100000007
+    priority: normal
