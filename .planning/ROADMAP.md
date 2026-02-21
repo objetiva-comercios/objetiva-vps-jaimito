@@ -28,7 +28,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. On startup after a crash, any rows stuck in `dispatching` status are reclaimed to `queued` automatically (logged at INFO level)
   4. Delivered messages older than 30 days and failed messages older than 90 days are purged on the scheduled cleanup run
   5. The systemd unit file installs and `systemctl start jaimito` brings up the process; `systemctl status jaimito` shows active
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Go module scaffold and YAML config package
+- [ ] 01-02-PLAN.md — SQLite persistence layer with schema, reclaim, and cleanup
+- [ ] 01-03-PLAN.md — Telegram validation, main.go wiring, and systemd unit
 
 ### Phase 2: Core Pipeline
 **Goal**: A running service that accepts authenticated HTTP notifications, queues them durably, and delivers them to Telegram with correct formatting and automatic retry
@@ -59,6 +64,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/TBD | Not started | - |
+| 1. Foundation | 0/3 | Planning complete | - |
 | 2. Core Pipeline | 0/TBD | Not started | - |
 | 3. CLI and Developer Experience | 0/TBD | Not started | - |
