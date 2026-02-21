@@ -32,7 +32,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 Plans:
 - [x] 01-01-PLAN.md — Go module scaffold and YAML config package
-- [ ] 01-02-PLAN.md — SQLite persistence layer with schema, reclaim, and cleanup
+- [x] 01-02-PLAN.md — SQLite persistence layer with schema, reclaim, and cleanup
 - [ ] 01-03-PLAN.md — Telegram validation, main.go wiring, and systemd unit
 
 ### Phase 2: Core Pipeline
@@ -64,6 +64,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 1/3 | In progress | - |
+| 1. Foundation | 2/3 | In progress | - |
 | 2. Core Pipeline | 0/TBD | Not started | - |
 | 3. CLI and Developer Experience | 0/TBD | Not started | - |

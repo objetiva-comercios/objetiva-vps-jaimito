@@ -16,10 +16,10 @@ Requirements for initial release (v0.1 MVP). Each maps to roadmap phases.
 
 ### Persistence
 
-- [ ] **PERS-01**: Service persists all messages to SQLite database in WAL mode
-- [ ] **PERS-02**: Service tracks dispatch attempts in a dispatch_log table
-- [ ] **PERS-03**: Service reclaims messages stuck in "dispatching" status on startup
-- [ ] **PERS-04**: Service purges delivered messages after 30 days and failed messages after 90 days
+- [x] **PERS-01**: Service persists all messages to SQLite database in WAL mode
+- [x] **PERS-02**: Service tracks dispatch attempts in a dispatch_log table
+- [x] **PERS-03**: Service reclaims messages stuck in "dispatching" status on startup
+- [x] **PERS-04**: Service purges delivered messages after 30 days and failed messages after 90 days
 
 ### Telegram
 
