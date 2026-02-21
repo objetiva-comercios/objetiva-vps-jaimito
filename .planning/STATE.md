@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 ## Current Position
 
 Phase: 2 of 3 (Core Pipeline)
-Plan: 1 of 3 in current phase
+Plan: 3 of 3 in current phase
 Status: Plan complete
-Last activity: 2026-02-21 — Plan 02-01 complete: config extension, schema migration 002, message queue CRUD, API key operations
+Last activity: 2026-02-21 — Plan 02-03 complete: MarkdownV2 message formatter and polling dispatcher with retry/429 handling
 
-Progress: [████░░░░░░] 44%
+Progress: [██████░░░░] 67%
 
 ## Performance Metrics
 
@@ -28,10 +28,10 @@ Progress: [████░░░░░░] 44%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-foundation | 3/3 | 16 min | 5 min |
-| 02-core-pipeline | 1/3 | 3 min | 3 min |
+| 02-core-pipeline | 3/3 | 5 min | 2 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (6 min), 01-02 (8 min), 01-03 (2 min), 02-01 (3 min)
+- Last 5 plans: 01-01 (6 min), 01-02 (8 min), 01-03 (2 min), 02-01 (3 min), 02-03 (2 min)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -60,6 +60,10 @@ Recent decisions affecting current work:
 - [02-01]: HashToken exported at package level — shared between SeedKeys and auth middleware to prevent divergence
 - [02-01]: SeedKeys uses INSERT OR IGNORE — idempotent, safe on every startup
 - [02-01]: SeedKeys logs key name at Info level only — raw key value never logged
+- [02-03]: Tags use literal # prefix written directly, then bot.EscapeMarkdown(tag) — passing "#tag" through EscapeMarkdown would produce \#tag
+- [02-03]: models.ParseModeMarkdown = "MarkdownV2" (use this); ParseModeMarkdownV1 = "Markdown" (old V1, do not use)
+- [02-03]: After 5 exhausted retries dispatcher returns nil (not error) — failure logged at Error level, silenced per CONTEXT.md
+- [02-03]: go-telegram/bot v1.19.0 TooManyRequestsError.RetryAfter is plain int (seconds) — no adaptive_retry field
 
 ### Pending Todos
 
@@ -67,10 +71,10 @@ None yet.
 
 ### Blockers/Concerns
 
-- [Phase 2]: Verify whether `go-telegram/bot` v1.19.0 `TooManyRequestsError` exposes the Bot API 8.0 `adaptive_retry` field, or if raw response parsing is needed
+None.
 
 ## Session Continuity
 
 Last session: 2026-02-21
-Stopped at: Completed 02-01-PLAN.md — config extension, schema migration 002, message queue CRUD, API key DB operations
+Stopped at: Completed 02-03-PLAN.md — MarkdownV2 formatter and polling dispatcher with retry/429 handling
 Resume file: None

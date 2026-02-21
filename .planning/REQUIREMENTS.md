@@ -24,8 +24,8 @@ Requirements for initial release (v0.1 MVP). Each maps to roadmap phases.
 ### Telegram
 
 - [x] **TELE-01**: Service delivers messages to configured Telegram chat via Bot API
-- [ ] **TELE-02**: Service formats messages with MarkdownV2 (priority emoji, bold title, code blocks, proper escaping)
-- [ ] **TELE-03**: Service retries failed deliveries with exponential backoff, respecting Telegram 429 `retry_after`
+- [x] **TELE-02**: Service formats messages with MarkdownV2 (priority emoji, bold title, code blocks, proper escaping)
+- [x] **TELE-03**: Service retries failed deliveries with exponential backoff, respecting Telegram 429 `retry_after`
 
 ### CLI
 
@@ -101,8 +101,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PERS-03 | Phase 1 | Complete (01-02) |
 | PERS-04 | Phase 1 | Complete (01-02) |
 | TELE-01 | Phase 2 | Complete |
-| TELE-02 | Phase 2 | Pending |
-| TELE-03 | Phase 2 | Pending |
+| TELE-02 | Phase 2 | Complete (02-03) |
+| TELE-03 | Phase 2 | Complete (02-03) |
 | CLI-01 | Phase 3 | Pending |
 | CLI-02 | Phase 3 | Pending |
 | CLI-03 | Phase 3 | Pending |
@@ -117,4 +117,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-21*
-*Last updated: 2026-02-21 after plan 01-03 completion (CONF-03 complete; Phase 1 all requirements complete)*
+*Last updated: 2026-02-21 after plan 02-03 completion (TELE-02, TELE-03 complete; formatter and dispatcher delivered)*
