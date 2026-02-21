@@ -4,6 +4,10 @@ telegram:
 database:
   path: "/var/lib/jaimito/jaimito.db"
 
+server:
+  # Listen address for the HTTP API (default: 127.0.0.1:8080)
+  listen: "127.0.0.1:8080"
+
 channels:
   - name: general
     chat_id: 100000001
@@ -32,3 +36,9 @@ channels:
   - name: monitoring
     chat_id: 100000007
     priority: normal
+
+# Seed API keys — inserted on first startup, ignored if already present.
+# Generate a key: openssl rand -hex 32 | sed 's/^/sk-/'
+seed_api_keys:
+  - name: "default"
+    key: "sk-REPLACE_ME_WITH_A_REAL_KEY"
