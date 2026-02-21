@@ -13,7 +13,7 @@ jaimito ships in three phases that follow the natural data flow of the product: 
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation** - Project scaffold, YAML config, SQLite persistence layer, and systemd unit
-- [ ] **Phase 2: Core Pipeline** - HTTP ingest endpoint with auth, Telegram dispatcher with retry — the product is alive
+- [x] **Phase 2: Core Pipeline** - HTTP ingest endpoint with auth, Telegram dispatcher with retry — the product is alive
 - [ ] **Phase 3: CLI and Developer Experience** - `jaimito send`, `jaimito wrap`, and `jaimito keys` completing the full user-facing surface
 
 ## Phase Details
@@ -45,13 +45,13 @@ Plans:
   3. `GET /api/v1/health` returns 200 JSON when the service is operational
   4. If Telegram is unreachable, the dispatcher retries with exponential backoff; a 429 response causes the dispatcher to wait exactly `retry_after` seconds before the next attempt
   5. After Telegram recovers, all queued messages that were pending during the outage are delivered in order
-**Plans:** 3/4 plans executed
+**Plans:** 4/4 plans complete
 
 Plans:
 - [x] 02-01-PLAN.md — Data layer: config extensions, schema migration, DB operations
-- [ ] 02-02-PLAN.md — HTTP API: chi router, bearer auth, notify and health endpoints
+- [x] 02-02-PLAN.md — HTTP API: chi router, bearer auth, notify and health endpoints
 - [x] 02-03-PLAN.md — Telegram formatter and dispatcher with retry logic
-- [ ] 02-04-PLAN.md — Main.go wiring: seed keys, dispatcher, HTTP server, graceful shutdown
+- [x] 02-04-PLAN.md — Main.go wiring: seed keys, dispatcher, HTTP server, graceful shutdown
 
 ### Phase 3: CLI and Developer Experience
 **Goal**: Operators can send notifications, wrap cron jobs, and manage API keys entirely from the command line without curl boilerplate
@@ -71,5 +71,5 @@ Phases execute in numeric order: 1 → 2 → 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete    | 2026-02-21 |
-| 2. Core Pipeline | 3/4 | In Progress|  |
+| 2. Core Pipeline | 4/4 | Complete   | 2026-02-21 |
 | 3. CLI and Developer Experience | 0/TBD | Not started | - |

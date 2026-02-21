@@ -5,33 +5,33 @@
 See: .planning/PROJECT.md (updated 2026-02-20)
 
 **Core value:** Every event that happens on the VPS gets reliably captured and delivered to Telegram — no notification is ever lost silently.
-**Current focus:** Phase 2 — Core Pipeline
+**Current focus:** Phase 2 complete — ready for Phase 3 (Deployment)
 
 ## Current Position
 
-Phase: 2 of 3 (Core Pipeline)
-Plan: 3 of 3 in current phase
-Status: Plan complete
-Last activity: 2026-02-21 — Plan 02-03 complete: MarkdownV2 message formatter and polling dispatcher with retry/429 handling
+Phase: 2 of 3 (Core Pipeline) — COMPLETE
+Plan: 4 of 4 in current phase
+Status: Phase complete
+Last activity: 2026-02-21 — Plan 02-04 complete: Full Phase 2 startup wiring — seed keys, dispatcher, HTTP server with graceful shutdown
 
-Progress: [██████░░░░] 67%
+Progress: [████████░░] 80%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
-- Average duration: 4 min
-- Total execution time: 0.3 hours
+- Total plans completed: 7
+- Average duration: 3 min
+- Total execution time: 0.4 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-foundation | 3/3 | 16 min | 5 min |
-| 02-core-pipeline | 3/3 | 5 min | 2 min |
+| 02-core-pipeline | 4/4 | 7 min | 2 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (6 min), 01-02 (8 min), 01-03 (2 min), 02-01 (3 min), 02-03 (2 min)
+- Last 5 plans: 01-02 (8 min), 01-03 (2 min), 02-01 (3 min), 02-03 (2 min), 02-04 (2 min)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -67,6 +67,9 @@ Recent decisions affecting current work:
 - [02-03]: models.ParseModeMarkdown = "MarkdownV2" (use this); ParseModeMarkdownV1 = "Markdown" (old V1, do not use)
 - [02-03]: After 5 exhausted retries dispatcher returns nil (not error) — failure logged at Error level, silenced per CONTEXT.md
 - [02-03]: go-telegram/bot v1.19.0 TooManyRequestsError.RetryAfter is plain int (seconds) — no adaptive_retry field
+- [02-04]: Dispatcher and cleanup start before HTTP server — delivery goroutines live before first API call lands
+- [02-04]: HTTP shutdown uses context.WithTimeout(context.Background(), 30s) — parent ctx already cancelled at shutdown time
+- [02-04]: errors.Is(err, http.ErrServerClosed) required — ListenAndServe returns this non-error on clean Shutdown()
 
 ### Pending Todos
 
@@ -79,5 +82,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-21
-Stopped at: Completed 02-03-PLAN.md — MarkdownV2 formatter and polling dispatcher with retry/429 handling
+Stopped at: Completed 02-04-PLAN.md — Full Phase 2 startup wiring: seed keys, dispatcher, HTTP server with graceful shutdown
 Resume file: None
