@@ -28,7 +28,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. On startup after a crash, any rows stuck in `dispatching` status are reclaimed to `queued` automatically (logged at INFO level)
   4. Delivered messages older than 30 days and failed messages older than 90 days are purged on the scheduled cleanup run
   5. The systemd unit file installs and `systemctl start jaimito` brings up the process; `systemctl status jaimito` shows active
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 01-01-PLAN.md — Go module scaffold and YAML config package
@@ -64,6 +64,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 3/3 | Complete | 2026-02-21 |
+| 1. Foundation | 3/3 | Complete    | 2026-02-21 |
 | 2. Core Pipeline | 0/TBD | Not started | - |
 | 3. CLI and Developer Experience | 0/TBD | Not started | - |
