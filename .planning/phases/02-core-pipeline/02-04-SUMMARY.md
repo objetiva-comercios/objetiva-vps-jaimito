@@ -76,7 +76,7 @@ Each task was committed atomically:
 1. **Task 1: Wire Phase 2 components into main.go startup sequence** - `4e0bfdb` (feat)
 2. **Task 2: Update example config with server and seed_api_keys sections** - `05afb42` (chore)
 
-**Plan metadata:** `(pending docs commit)`
+**Plan metadata:** `2ce10b8` (docs: complete plan)
 
 ## Files Created/Modified
 - `cmd/jaimito/main.go` - Extended startup sequence: seed keys (step 10), dispatcher.Start (step 11), cleanup.Start (step 12), HTTP server with goroutine (step 13), ready log (step 14), graceful shutdown (step 15)
