@@ -45,7 +45,13 @@ Plans:
   3. `GET /api/v1/health` returns 200 JSON when the service is operational
   4. If Telegram is unreachable, the dispatcher retries with exponential backoff; a 429 response causes the dispatcher to wait exactly `retry_after` seconds before the next attempt
   5. After Telegram recovers, all queued messages that were pending during the outage are delivered in order
-**Plans**: TBD
+**Plans:** 4 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — Data layer: config extensions, schema migration, DB operations
+- [ ] 02-02-PLAN.md — HTTP API: chi router, bearer auth, notify and health endpoints
+- [ ] 02-03-PLAN.md — Telegram formatter and dispatcher with retry logic
+- [ ] 02-04-PLAN.md — Main.go wiring: seed keys, dispatcher, HTTP server, graceful shutdown
 
 ### Phase 3: CLI and Developer Experience
 **Goal**: Operators can send notifications, wrap cron jobs, and manage API keys entirely from the command line without curl boilerplate
@@ -65,5 +71,5 @@ Phases execute in numeric order: 1 → 2 → 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete    | 2026-02-21 |
-| 2. Core Pipeline | 0/TBD | Not started | - |
+| 2. Core Pipeline | 0/4 | Planned | - |
 | 3. CLI and Developer Experience | 0/TBD | Not started | - |
