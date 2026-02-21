@@ -176,3 +176,161 @@ channels:
 		t.Errorf("expected 7 channels, got %d", len(cfg.Channels))
 	}
 }
+
+func TestLoad_DefaultServerListen(t *testing.T) {
+	content := `
+telegram:
+  token: "test-token"
+channels:
+  - name: general
+    chat_id: 12345
+    priority: normal
+`
+	path := writeTempConfig(t, content)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if cfg.Server.Listen != "127.0.0.1:8080" {
+		t.Errorf("expected default server.listen '127.0.0.1:8080', got %q", cfg.Server.Listen)
+	}
+}
+
+func TestLoad_ExplicitServerListen(t *testing.T) {
+	content := `
+telegram:
+  token: "test-token"
+channels:
+  - name: general
+    chat_id: 12345
+    priority: normal
+server:
+  listen: "0.0.0.0:9090"
+`
+	path := writeTempConfig(t, content)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if cfg.Server.Listen != "0.0.0.0:9090" {
+		t.Errorf("expected server.listen '0.0.0.0:9090', got %q", cfg.Server.Listen)
+	}
+}
+
+func TestChannelExists(t *testing.T) {
+	content := `
+telegram:
+  token: "test-token"
+channels:
+  - name: general
+    chat_id: 12345
+    priority: normal
+  - name: deploys
+    chat_id: 67890
+    priority: high
+`
+	path := writeTempConfig(t, content)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if !cfg.ChannelExists("general") {
+		t.Error("expected ChannelExists('general') to return true")
+	}
+	if !cfg.ChannelExists("deploys") {
+		t.Error("expected ChannelExists('deploys') to return true")
+	}
+	if cfg.ChannelExists("missing") {
+		t.Error("expected ChannelExists('missing') to return false")
+	}
+}
+
+func TestChatIDForChannel(t *testing.T) {
+	content := `
+telegram:
+  token: "test-token"
+channels:
+  - name: general
+    chat_id: 12345
+    priority: normal
+  - name: deploys
+    chat_id: 67890
+    priority: high
+`
+	path := writeTempConfig(t, content)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if id := cfg.ChatIDForChannel("general"); id != 12345 {
+		t.Errorf("expected ChatIDForChannel('general') = 12345, got %d", id)
+	}
+	if id := cfg.ChatIDForChannel("deploys"); id != 67890 {
+		t.Errorf("expected ChatIDForChannel('deploys') = 67890, got %d", id)
+	}
+	if id := cfg.ChatIDForChannel("missing"); id != 0 {
+		t.Errorf("expected ChatIDForChannel('missing') = 0, got %d", id)
+	}
+}
+
+func TestValidate_SeedAPIKeys_Valid(t *testing.T) {
+	content := `
+telegram:
+  token: "test-token"
+channels:
+  - name: general
+    chat_id: 12345
+    priority: normal
+seed_api_keys:
+  - name: "ci-bot"
+    key: "sk-abc123"
+  - name: "deploy-agent"
+    key: "sk-xyz789"
+`
+	path := writeTempConfig(t, content)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("expected no error for valid seed_api_keys, got: %v", err)
+	}
+	if len(cfg.SeedAPIKeys) != 2 {
+		t.Errorf("expected 2 seed api keys, got %d", len(cfg.SeedAPIKeys))
+	}
+}
+
+func TestValidate_SeedAPIKeys_MissingName(t *testing.T) {
+	content := `
+telegram:
+  token: "test-token"
+channels:
+  - name: general
+    chat_id: 12345
+    priority: normal
+seed_api_keys:
+  - name: ""
+    key: "sk-abc123"
+`
+	path := writeTempConfig(t, content)
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("expected error for missing seed api key name, got nil")
+	}
+}
+
+func TestValidate_SeedAPIKeys_MissingSkPrefix(t *testing.T) {
+	content := `
+telegram:
+  token: "test-token"
+channels:
+  - name: general
+    chat_id: 12345
+    priority: normal
+seed_api_keys:
+  - name: "ci-bot"
+    key: "invalid-key"
+`
+	path := writeTempConfig(t, content)
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("expected error for key missing sk- prefix, got nil")
+	}
+}

@@ -4,15 +4,18 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
 // Config is the top-level configuration struct for jaimito.
 type Config struct {
-	Telegram TelegramConfig  `yaml:"telegram"`
-	Database DatabaseConfig  `yaml:"database"`
-	Channels []ChannelConfig `yaml:"channels"`
+	Telegram    TelegramConfig  `yaml:"telegram"`
+	Database    DatabaseConfig  `yaml:"database"`
+	Channels    []ChannelConfig `yaml:"channels"`
+	Server      ServerConfig    `yaml:"server"`
+	SeedAPIKeys []SeedAPIKey    `yaml:"seed_api_keys"`
 }
 
 // TelegramConfig holds Telegram bot credentials.
@@ -30,6 +33,17 @@ type ChannelConfig struct {
 	Name     string `yaml:"name"`
 	ChatID   int64  `yaml:"chat_id"`
 	Priority string `yaml:"priority"`
+}
+
+// ServerConfig holds HTTP server settings.
+type ServerConfig struct {
+	Listen string `yaml:"listen"`
+}
+
+// SeedAPIKey represents a pre-seeded API key to be inserted on startup.
+type SeedAPIKey struct {
+	Name string `yaml:"name"`
+	Key  string `yaml:"key"`
 }
 
 // validPriorities is the set of accepted priority values.
@@ -55,6 +69,11 @@ func Load(path string) (*Config, error) {
 	// Set default database path if not specified.
 	if cfg.Database.Path == "" {
 		cfg.Database.Path = "/var/lib/jaimito/jaimito.db"
+	}
+
+	// Default server listen address — localhost-only for VPS security.
+	if cfg.Server.Listen == "" {
+		cfg.Server.Listen = "127.0.0.1:8080"
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -105,5 +124,34 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("a channel named 'general' is required")
 	}
 
+	for _, k := range c.SeedAPIKeys {
+		if k.Name == "" {
+			return fmt.Errorf("seed_api_keys: name must not be empty")
+		}
+		if !strings.HasPrefix(k.Key, "sk-") {
+			return fmt.Errorf("seed_api_keys: key for %q must start with \"sk-\"", k.Name)
+		}
+	}
+
 	return nil
+}
+
+// ChannelExists reports whether a channel with the given name is configured.
+func (c *Config) ChannelExists(name string) bool {
+	for _, ch := range c.Channels {
+		if ch.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+// ChatIDForChannel returns the chat_id for the named channel, or 0 if not found.
+func (c *Config) ChatIDForChannel(name string) int64 {
+	for _, ch := range c.Channels {
+		if ch.Name == name {
+			return ch.ChatID
+		}
+	}
+	return 0
 }
