@@ -11,8 +11,8 @@ Requirements for initial release (v0.1 MVP). Each maps to roadmap phases.
 
 - [x] **API-01**: Service accepts HTTP POST to `/api/v1/notify` with JSON payload (title, body, channel, priority, tags, metadata)
 - [x] **API-02**: Service authenticates requests via Bearer token with `sk-` prefix API keys
-- [ ] **API-03**: Service returns 202 with message ID on success, 400 on invalid payload, 401 on bad auth
-- [ ] **API-04**: Service exposes `GET /api/v1/health` returning 200 when operational
+- [x] **API-03**: Service returns 202 with message ID on success, 400 on invalid payload, 401 on bad auth
+- [x] **API-04**: Service exposes `GET /api/v1/health` returning 200 when operational
 
 ### Persistence
 
@@ -94,8 +94,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | API-01 | Phase 2 | Complete |
 | API-02 | Phase 2 | Complete |
-| API-03 | Phase 2 | Pending |
-| API-04 | Phase 2 | Pending |
+| API-03 | Phase 2 | Complete |
+| API-04 | Phase 2 | Complete |
 | PERS-01 | Phase 1 | Complete (01-02) |
 | PERS-02 | Phase 1 | Complete (01-02) |
 | PERS-03 | Phase 1 | Complete (01-02) |

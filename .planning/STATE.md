@@ -60,6 +60,9 @@ Recent decisions affecting current work:
 - [02-01]: HashToken exported at package level — shared between SeedKeys and auth middleware to prevent divergence
 - [02-01]: SeedKeys uses INSERT OR IGNORE — idempotent, safe on every startup
 - [02-01]: SeedKeys logs key name at Info level only — raw key value never logged
+- [02-02]: NewRouter takes no *bot.Bot — API layer enqueues to DB only; dispatcher reads independently (clean separation)
+- [02-02]: BearerAuth uses db.HashToken (same function as SeedKeys) — no hash mismatch possible
+- [02-02]: channel and priority defaults (general, normal) applied before validation so partial payloads are valid
 - [02-03]: Tags use literal # prefix written directly, then bot.EscapeMarkdown(tag) — passing "#tag" through EscapeMarkdown would produce \#tag
 - [02-03]: models.ParseModeMarkdown = "MarkdownV2" (use this); ParseModeMarkdownV1 = "Markdown" (old V1, do not use)
 - [02-03]: After 5 exhausted retries dispatcher returns nil (not error) — failure logged at Error level, silenced per CONTEXT.md
