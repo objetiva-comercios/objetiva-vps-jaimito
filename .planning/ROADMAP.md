@@ -71,5 +71,5 @@ Phases execute in numeric order: 1 → 2 → 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete    | 2026-02-21 |
-| 2. Core Pipeline | 4/4 | Complete   | 2026-02-21 |
+| 2. Core Pipeline | 4/4 | Complete    | 2026-02-21 |
 | 3. CLI and Developer Experience | 0/TBD | Not started | - |
