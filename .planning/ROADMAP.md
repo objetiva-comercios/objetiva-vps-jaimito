@@ -61,7 +61,12 @@ Plans:
   1. `jaimito send "Backup complete"` delivers a notification to Telegram; `-c cron -p high` flags route it to the correct channel at the correct priority
   2. `jaimito wrap -- /path/to/backup.sh` runs the script silently on success and sends a failure notification with exit code and captured output if the script exits non-zero
   3. `jaimito keys create --name backup-service` creates a new `sk-` prefixed API key and prints it once; `jaimito keys list` shows it; `jaimito keys revoke <id>` removes it without requiring a server restart
-**Plans**: TBD
+**Plans:** 1/3 plans complete
+
+Plans:
+- [x] 03-01-PLAN.md — CLI scaffold with cobra, serve extraction, and keys subcommand
+- [ ] 03-02-PLAN.md — HTTP client package and send subcommand
+- [ ] 03-03-PLAN.md — Wrap subcommand for cron job monitoring
 
 ## Progress
 
@@ -72,4 +77,4 @@ Phases execute in numeric order: 1 → 2 → 3
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete    | 2026-02-21 |
 | 2. Core Pipeline | 4/4 | Complete    | 2026-02-21 |
-| 3. CLI and Developer Experience | 0/TBD | Not started | - |
+| 3. CLI and Developer Experience | 1/3 | In Progress | - |

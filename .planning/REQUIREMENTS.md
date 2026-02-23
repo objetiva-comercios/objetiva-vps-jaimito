@@ -31,7 +31,7 @@ Requirements for initial release (v0.1 MVP). Each maps to roadmap phases.
 
 - [ ] **CLI-01**: `jaimito send "message"` sends a notification with optional -c channel, -p priority, --stdin flags
 - [ ] **CLI-02**: `jaimito wrap -c channel -- /path/to/cmd` runs a command and notifies on failure with exit code and output
-- [ ] **CLI-03**: `jaimito keys create/list/revoke` manages API keys without server restart
+- [x] **CLI-03**: `jaimito keys create/list/revoke` manages API keys without server restart
 
 ### Configuration
 
@@ -105,7 +105,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TELE-03 | Phase 2 | Complete (02-03) |
 | CLI-01 | Phase 3 | Pending |
 | CLI-02 | Phase 3 | Pending |
-| CLI-03 | Phase 3 | Pending |
+| CLI-03 | Phase 3 | Complete |
 | CONF-01 | Phase 1 | Complete (01-01) |
 | CONF-02 | Phase 1 | Complete (01-01) |
 | CONF-03 | Phase 1 | Complete (01-03) |
