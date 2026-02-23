@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation** - Project scaffold, YAML config, SQLite persistence layer, and systemd unit
 - [x] **Phase 2: Core Pipeline** - HTTP ingest endpoint with auth, Telegram dispatcher with retry — the product is alive
-- [ ] **Phase 3: CLI and Developer Experience** - `jaimito send`, `jaimito wrap`, and `jaimito keys` completing the full user-facing surface
+- [x] **Phase 3: CLI and Developer Experience** - `jaimito send`, `jaimito wrap`, and `jaimito keys` completing the full user-facing surface (completed 2026-02-23)
 
 ## Phase Details
 
@@ -61,7 +61,7 @@ Plans:
   1. `jaimito send "Backup complete"` delivers a notification to Telegram; `-c cron -p high` flags route it to the correct channel at the correct priority
   2. `jaimito wrap -- /path/to/backup.sh` runs the script silently on success and sends a failure notification with exit code and captured output if the script exits non-zero
   3. `jaimito keys create --name backup-service` creates a new `sk-` prefixed API key and prints it once; `jaimito keys list` shows it; `jaimito keys revoke <id>` removes it without requiring a server restart
-**Plans:** 2/3 plans complete
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 03-01-PLAN.md — CLI scaffold with cobra, serve extraction, and keys subcommand
@@ -77,4 +77,4 @@ Phases execute in numeric order: 1 → 2 → 3
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete    | 2026-02-21 |
 | 2. Core Pipeline | 4/4 | Complete    | 2026-02-21 |
-| 3. CLI and Developer Experience | 2/3 | In Progress | - |
+| 3. CLI and Developer Experience | 3/3 | Complete   | 2026-02-23 |
