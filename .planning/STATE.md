@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 ## Current Position
 
 Phase: 3 of 3 (CLI and Developer Experience) — IN PROGRESS
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: Plans ready for execution
-Last activity: 2026-02-23 — 03-01 complete: cobra scaffold, keys create/list/revoke
+Last activity: 2026-02-23 — 03-02 complete: HTTP client package, send subcommand
 
-Progress: [█████████░] 87%
+Progress: [█████████░] 93%
 
 ## Performance Metrics
 
@@ -29,10 +29,10 @@ Progress: [█████████░] 87%
 |-------|-------|-------|----------|
 | 01-foundation | 3/3 | 16 min | 5 min |
 | 02-core-pipeline | 4/4 | 7 min | 2 min |
-| 03-cli-developer-experience | 1/3 | 2 min | 2 min |
+| 03-cli-developer-experience | 2/3 | 3 min | 1.5 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-03 (2 min), 02-01 (3 min), 02-03 (2 min), 02-04 (2 min), 03-01 (2 min)
+- Last 5 plans: 02-01 (3 min), 02-03 (2 min), 02-04 (2 min), 03-01 (2 min), 03-02 (1 min)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -76,6 +76,9 @@ Recent decisions affecting current work:
 - [03-01]: keys subcommands use direct DB access — key management bypasses auth middleware by design
 - [03-01]: openDB applies schema on each invocation — idempotent, CLI works on fresh or existing DB
 - [03-01]: CreateKey uses crypto/rand 32 bytes -> hex -> sk- prefix — 256 bits entropy
+- [03-02]: internal/client does not import internal/api — client-side NotifyRequest mirrors server struct to avoid circular dependency
+- [03-02]: New() takes host:port and prepends http:// — consistent with config.Server.Listen format
+- [03-02]: Title is pointer field only set when --title flag explicitly provided; channel/priority sent empty (server applies defaults)
 
 ### Pending Todos
 
@@ -88,5 +91,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-23
-Stopped at: Completed 03-01-PLAN.md — Cobra scaffold, keys create/list/revoke subcommands with direct DB access
+Stopped at: Completed 03-02-PLAN.md — HTTP client package, send subcommand with full flag support
 Resume file: None
