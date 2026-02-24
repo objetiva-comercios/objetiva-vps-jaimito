@@ -1,26 +1,27 @@
 # jaimito
 
-Hub de notificaciones push para VPS. Centraliza alertas de servicios, cron jobs, errores de aplicación y health checks en un único binario Go respaldado por SQLite, y las despacha a Telegram con reintentos automáticos. Los servicios envían mensajes a través de una API HTTP o un CLI companion; jaimito los encola, persiste y entrega sin que ninguna notificación se pierda silenciosamente. Pensado para un VPS personal con múltiples servicios y cron jobs que hoy fallan sin aviso.
+Hub de notificaciones push para VPS. Centraliza todas las alertas generadas en un VPS (eventos de servicios, resultados de cron jobs, errores de aplicación, health checks) y las despacha a Telegram a través de un único binario Go respaldado por SQLite. Los servicios envían mensajes mediante una API HTTP webhook o un CLI companion; jaimito los encola, persiste y entrega con reintentos automáticos. Ninguna notificación se pierde silenciosamente.
 
 ## Tecnologías
 
 | Categoría | Tecnología |
 |-----------|------------|
 | Lenguaje | Go 1.24 |
-| Base de datos | SQLite (WAL mode) via `modernc.org/sqlite` |
-| HTTP | `go-chi/chi` v5 |
-| CLI | `spf13/cobra` |
-| Telegram | `go-telegram/bot` v1 |
+| Base de datos | SQLite (WAL mode) via `modernc.org/sqlite` v1.46 (CGO-free) |
+| HTTP Router | `go-chi/chi` v5 |
+| CLI | `spf13/cobra` v1.10 |
+| Telegram | `go-telegram/bot` v1.19 |
 | Migraciones | `adlio/schema` |
-| IDs | `google/uuid` v7 |
+| IDs | `google/uuid` v7 (time-ordered) |
+| Configuración | YAML via `gopkg.in/yaml.v3` |
 | Despliegue | systemd, binario estático |
 
 ## Requisitos previos
 
-- Go 1.24 o superior
-- Un bot de Telegram (token obtenido de [@BotFather](https://t.me/BotFather))
-- El chat ID de Telegram donde el bot enviará mensajes
-- Linux con systemd (para despliegue en producción)
+- **Go 1.24** o superior
+- Un **bot de Telegram** (token obtenido de [@BotFather](https://t.me/BotFather))
+- El **chat ID** de Telegram donde el bot enviará mensajes
+- **Linux con systemd** (para despliegue en producción)
 
 ## Instalación
 
@@ -43,7 +44,7 @@ sudo cp configs/config.example.yaml /etc/jaimito/config.yaml
 # 5. Editar la configuración con tus datos
 sudo nano /etc/jaimito/config.yaml
 
-# 6. Generar una API key
+# 6. Generar una API key para seed_api_keys
 openssl rand -hex 32 | sed 's/^/sk-/'
 ```
 
@@ -77,22 +78,20 @@ seed_api_keys:
     key: "sk-TU_CLAVE_AQUI"
 ```
 
-### Campos de configuración
-
 | Campo | Requerido | Default | Descripción |
 |-------|-----------|---------|-------------|
-| `telegram.token` | Sí | — | Token del bot de Telegram obtenido de @BotFather |
+| `telegram.token` | Sí | — | Token del bot de Telegram |
 | `database.path` | No | `/var/lib/jaimito/jaimito.db` | Ruta al archivo SQLite |
 | `server.listen` | No | `127.0.0.1:8080` | Dirección y puerto del servidor HTTP |
-| `channels` | Sí | — | Lista de canales de notificación (mínimo 1, debe incluir `general`) |
+| `channels` | Sí | — | Lista de canales (mínimo 1, debe incluir `general`) |
 | `channels[].name` | Sí | — | Nombre único del canal |
 | `channels[].chat_id` | Sí | — | ID del chat de Telegram (negativo para grupos) |
 | `channels[].priority` | Sí | — | Prioridad por defecto: `low`, `normal`, `high` |
-| `seed_api_keys` | No | — | Claves API pre-cargadas al iniciar (deben empezar con `sk-`) |
+| `seed_api_keys` | No | — | Claves API pre-cargadas al iniciar (prefijo `sk-`) |
 
 ### Variables de entorno
 
-Los subcomandos CLI (`send`, `wrap`) usan estas variables de entorno para conectarse al servidor:
+Los subcomandos CLI (`send`, `wrap`) usan estas variables para conectarse al servidor:
 
 ```env
 JAIMITO_API_KEY=sk-tu-clave-de-api-aqui
@@ -104,38 +103,23 @@ JAIMITO_SERVER=127.0.0.1:8080
 | `JAIMITO_API_KEY` | Clave de autenticación para `send` y `wrap` | `--key` |
 | `JAIMITO_SERVER` | Dirección del servidor | `--server` |
 
-La prioridad de resolución es: flag `--key`/`--server` > variable de entorno > config file > default.
-
-### Obtener el chat ID de Telegram
-
-1. Creá un bot con [@BotFather](https://t.me/BotFather) y copiá el token
-2. Abrí el chat con tu bot y enviá un mensaje (ej: "hola")
-3. Ejecutá:
-
-```bash
-curl -s "https://api.telegram.org/botTU_TOKEN/getUpdates" | python3 -m json.tool
-```
-
-4. Buscá el campo `"chat": {"id": NUMERO}` — ese es tu `chat_id`
-
-Para grupos, el `chat_id` es negativo (ej: `-100123456789`). Todos los canales pueden apuntar al mismo `chat_id` o a distintos grupos.
+Prioridad de resolución: flag `--key`/`--server` > variable de entorno > config file > default.
 
 ## Uso
 
 | Comando | Descripción |
 |---------|-------------|
-| `jaimito` | Inicia el servidor daemon (default) |
-| `jaimito --config /ruta/config.yaml` | Inicia el servidor con config personalizado |
-| `jaimito send "mensaje"` | Envía una notificación al canal `general` |
+| `jaimito` | Inicia el servidor daemon |
+| `jaimito --config /ruta/config.yaml` | Inicia con config personalizado |
+| `jaimito send "mensaje"` | Envía notificación al canal `general` |
 | `jaimito send -c cron -p high "mensaje"` | Envía con canal y prioridad específicos |
-| `jaimito send -t "Título" "cuerpo"` | Envía con título |
-| `jaimito send --tags backup,cron "mensaje"` | Envía con tags |
+| `jaimito send -t "Título" "cuerpo"` | Envía con título (negrita en Telegram) |
+| `jaimito send --tags backup,cron "mensaje"` | Envía con tags (hashtags en Telegram) |
 | `jaimito send --stdin` | Lee el cuerpo del mensaje desde stdin |
 | `jaimito wrap -- /path/to/script.sh` | Ejecuta un comando y notifica si falla |
 | `jaimito wrap -c cron -- comando args` | Wrap con canal específico |
-| `jaimito wrap -p high -- comando args` | Wrap con prioridad específica |
-| `jaimito keys create --name mi-servicio` | Crea una nueva API key (`sk-` prefijo) |
-| `jaimito keys list` | Lista las claves activas con ID, nombre y fecha |
+| `jaimito keys create --name mi-servicio` | Crea una nueva API key (prefijo `sk-`) |
+| `jaimito keys list` | Lista las claves activas |
 | `jaimito keys revoke <id>` | Revoca una clave por su UUID |
 | `go build ./cmd/jaimito` | Compila el binario |
 | `go test ./...` | Ejecuta todos los tests |
@@ -144,24 +128,25 @@ Para grupos, el `chat_id` es negativo (ej: `-100123456789`). Todos los canales p
 ### Iniciar el servidor
 
 ```bash
-# Directamente (foreground)
+# Foreground
 ./jaimito
 
 # Con config personalizado
 ./jaimito --config /ruta/a/config.yaml
 ```
 
-Al iniciar, el servidor ejecuta la siguiente secuencia:
+Secuencia de inicio:
+
 1. Carga y valida la configuración YAML
-2. Valida el token del bot de Telegram (llamada a `getMe`)
-3. Valida cada `chat_id` configurado (llamada a `getChat`)
+2. Valida el token del bot de Telegram (`getMe`)
+3. Valida cada `chat_id` configurado (`getChat`)
 4. Abre la base de datos SQLite con WAL mode
 5. Aplica migraciones de schema pendientes
 6. Reclama mensajes en estado `dispatching` (crash recovery)
 7. Inserta las `seed_api_keys` si no existen
 8. Inicia el dispatcher de Telegram (polling cada 1s)
 9. Inicia el scheduler de limpieza (cada 24h)
-10. Levanta el servidor HTTP en `server.listen`
+10. Levanta el servidor HTTP
 
 ### Despliegue con systemd
 
@@ -179,24 +164,6 @@ systemctl status jaimito
 curl -s http://127.0.0.1:8080/api/v1/health
 ```
 
-### Gestionar claves API
-
-```bash
-# Crear una clave nueva (se imprime una sola vez)
-jaimito keys create --name backup-service
-# Output: sk-a1b2c3d4e5f6...
-
-# Listar claves activas
-jaimito keys list
-# ID                                    NAME              CREATED              LAST USED
-# 550e8400-e29b-41d4-a716-446655440000  backup-service    2026-02-24 15:00:00  2026-02-24 15:30:00
-
-# Revocar una clave (efecto inmediato, sin reiniciar)
-jaimito keys revoke 550e8400-e29b-41d4-a716-446655440000
-```
-
-Las claves se almacenan como hash SHA-256 en la base de datos. La clave raw solo se muestra al momento de creación.
-
 ### Enviar notificaciones
 
 ```bash
@@ -211,11 +178,7 @@ jaimito send -c cron -p high "Backup falló"
 # Con título
 jaimito send -t "Deploy" "v1.2.3 desplegado en producción"
 
-# Con tags
-jaimito send --tags deploy,produccion "Deploy exitoso"
-
-# Desde stdin (útil para pipear output de otros comandos)
-echo "uso de disco: 90%" | jaimito send --stdin -c monitoring
+# Desde stdin
 df -h / | jaimito send --stdin -t "Disk Report" -c system
 ```
 
@@ -224,20 +187,33 @@ df -h / | jaimito send --stdin -t "Disk Report" -c system
 ```bash
 export JAIMITO_API_KEY=sk-tu-clave-aqui
 
-# Si el comando falla, envía notificación con código de salida y output capturado
+# Si el comando falla, envía notificación con exit code y output capturado
 jaimito wrap -- /path/to/backup.sh
 
-# Con canal específico
-jaimito wrap -c cron -- pg_dump -F c mydb -f /backups/mydb.dump
-
-# Con prioridad alta
+# Con canal y prioridad
 jaimito wrap -c cron -p high -- /usr/local/bin/certbot renew
 ```
 
 Comportamiento de `wrap`:
+
 - **Éxito (exit 0)**: sale silenciosamente, sin notificación
-- **Fallo (exit != 0)**: envía notificación con nombre del comando, código de salida y salida capturada (truncada a 3500 bytes), luego sale con el mismo código del comando original
-- La notificación es best-effort: si falla el envío, preserva el exit code del comando original
+- **Fallo (exit != 0)**: envía notificación con nombre del comando, código de salida y output capturado (truncado a 3500 bytes), luego sale con el mismo código del comando original
+
+### Gestionar claves API
+
+```bash
+# Crear una clave nueva (se imprime una sola vez)
+jaimito keys create --name backup-service
+# Output: sk-a1b2c3d4e5f6...
+
+# Listar claves activas
+jaimito keys list
+
+# Revocar una clave (efecto inmediato, sin reiniciar)
+jaimito keys revoke 550e8400-e29b-41d4-a716-446655440000
+```
+
+Las claves se almacenan como hash SHA-256 en la base de datos. La clave raw solo se muestra al momento de creación.
 
 ## Arquitectura del proyecto
 
@@ -246,7 +222,7 @@ Comportamiento de `wrap`:
 │   └── jaimito/
 │       ├── main.go            # Entry point
 │       ├── root.go            # Comando raíz, flags globales, resolvers
-│       ├── serve.go           # Servidor daemon (secuencia de 10 pasos)
+│       ├── serve.go           # Servidor daemon (secuencia de inicio)
 │       ├── send.go            # Subcomando send
 │       ├── wrap.go            # Subcomando wrap (monitoreo de cron)
 │       └── keys.go            # Subcomando keys (create/list/revoke)
@@ -258,7 +234,7 @@ Comportamiento de `wrap`:
 │   │   └── response.go        # Helpers de respuesta JSON
 │   ├── config/
 │   │   ├── config.go          # Carga YAML, validación, defaults
-│   │   └── config_test.go     # Tests de validación
+│   │   └── config_test.go     # Tests de configuración
 │   ├── db/
 │   │   ├── db.go              # Conexión SQLite, WAL mode, single-writer
 │   │   ├── messages.go        # Cola: enqueue, status transitions, cleanup
@@ -274,12 +250,12 @@ Comportamiento de `wrap`:
 │   ├── client/
 │   │   └── client.go          # Cliente HTTP para /api/v1/notify
 │   └── cleanup/
-│       └── scheduler.go       # Purga: 30d entregados, 90d fallidos, cada 24h
+│       └── scheduler.go       # Purga: 30d entregados, 90d fallidos
 ├── configs/
-│   └── config.example.yaml    # Configuración de ejemplo completa
+│   └── config.example.yaml    # Configuración de ejemplo
 ├── systemd/
 │   └── jaimito.service        # Unit file para systemd
-├── go.mod                     # Módulo: github.com/chiguire/jaimito
+├── go.mod                     # Módulo Go
 └── go.sum
 ```
 
@@ -297,22 +273,12 @@ Servicio/Cron → CLI (send/wrap) → HTTP POST /api/v1/notify
                               Telegram Bot API → Chat
 ```
 
-### Schema de base de datos
-
-| Tabla | Propósito |
-|-------|-----------|
-| `messages` | Cola de mensajes: id (UUID v7), channel, priority, title, body, tags, metadata, status, timestamps |
-| `dispatch_log` | Historial de intentos de entrega: attempt number, status, error, timestamp |
-| `api_keys` | Claves de autenticación: key_hash (SHA-256), name, created_at, last_used_at, revoked |
-
-Estados del mensaje: `queued` → `dispatching` → `delivered` / `failed`
-
 ## API
 
 | Método | Ruta | Auth | Descripción |
 |--------|------|------|-------------|
-| `GET` | `/api/v1/health` | No | Health check. Retorna `{"status": "ok", "service": "jaimito"}` |
-| `POST` | `/api/v1/notify` | Bearer | Envía una notificación a la cola |
+| `GET` | `/api/v1/health` | No | Health check: `{"status": "ok", "service": "jaimito"}` |
+| `POST` | `/api/v1/notify` | Bearer | Encola una notificación |
 
 ### POST /api/v1/notify
 
@@ -342,16 +308,16 @@ Content-Type: application/json
 | `channel` | No | `general` | Canal de notificación (debe existir en config) |
 | `priority` | No | `normal` | Prioridad: `low`, `normal`, `high` |
 | `title` | No | — | Título del mensaje (negrita en Telegram) |
-| `tags` | No | — | Lista de etiquetas (se muestran como `#tag` en Telegram) |
+| `tags` | No | — | Lista de etiquetas (se muestran como `#tag`) |
 | `metadata` | No | — | Objeto JSON arbitrario (almacenado, no mostrado) |
 
 **Respuestas:**
 
-| Código | Body | Significado |
-|--------|------|-------------|
-| 202 | `{"id": "019c9039-c807-7e68-975a-5d9af09374f2"}` | Mensaje encolado exitosamente |
-| 400 | `{"error": "body is required"}` | Payload inválido o canal inexistente |
-| 401 | `{"error": "unauthorized"}` | Token ausente, inválido o revocado |
+| Código | Significado |
+|--------|-------------|
+| `202` | Mensaje encolado: `{"id": "uuid-v7"}` |
+| `400` | Payload inválido o canal inexistente |
+| `401` | Token ausente, inválido o revocado |
 
 **Ejemplo con curl:**
 
@@ -359,7 +325,7 @@ Content-Type: application/json
 curl -X POST http://127.0.0.1:8080/api/v1/notify \
   -H "Authorization: Bearer sk-tu-clave-aqui" \
   -H "Content-Type: application/json" \
-  -d '{"body": "Backup completado", "channel": "cron", "priority": "normal"}'
+  -d '{"body": "Backup completado", "channel": "cron"}'
 ```
 
 ### Formato en Telegram
@@ -368,15 +334,15 @@ Los mensajes se formatean en MarkdownV2 con emoji según prioridad:
 
 | Prioridad | Emoji | Ejemplo |
 |-----------|-------|---------|
-| `low` | 🟢 | 🟢 Mensaje bajo |
+| `low` | 🟢 | 🟢 Mensaje de baja prioridad |
 | `normal` | 🟡 | 🟡 **Título** Mensaje normal |
 | `high` | 🔴 | 🔴 **Título** Mensaje urgente |
 
-Los tags se agregan como hashtags al final: `#backup #cron`.
+Los tags se agregan como hashtags al final del mensaje: `#backup #cron`.
 
 ## Scripts y automatización
 
-### Monitoreo de cron jobs
+### Monitoreo de cron jobs con wrap
 
 `jaimito wrap` es la forma recomendada de monitorear cron jobs. Envolvé cualquier comando existente sin modificar su lógica:
 
@@ -389,27 +355,26 @@ Los tags se agregan como hashtags al final: `#backup #cron`.
 
 ### Limpieza automática de la base de datos
 
-El servidor ejecuta un ciclo de limpieza cada 24 horas (primer ejecución al iniciar, luego cada 24h):
+El servidor ejecuta un ciclo de limpieza cada 24 horas (primer ejecución al iniciar):
 
-- Mensajes entregados con más de 30 días → eliminados
-- Mensajes fallidos con más de 90 días → eliminados
-- Registros de `dispatch_log` asociados → eliminados en la misma transacción
+- Mensajes entregados con más de **30 días** se eliminan
+- Mensajes fallidos con más de **90 días** se eliminan
+- Registros de `dispatch_log` asociados se eliminan en la misma transacción
 
 ### Reintentos de entrega
 
 El dispatcher revisa la cola cada 1 segundo y entrega los mensajes a Telegram:
 
-- Backoff exponencial: 2s, 4s, 8s, 16s entre reintentos
-- Máximo 5 intentos antes de marcar como `failed`
-- Rate limit (HTTP 429): respeta el `retry_after` exacto de Telegram
-- Crash recovery: al reiniciar, mensajes en estado `dispatching` se reclaman a `queued`
+- **Backoff exponencial**: 2s, 4s, 8s, 16s entre reintentos
+- **Máximo 5 intentos** antes de marcar como `failed`
+- **Rate limit (HTTP 429)**: respeta el `retry_after` exacto de Telegram
+- **Crash recovery**: al reiniciar, mensajes en estado `dispatching` se reclaman a `queued`
 
 ### Notificaciones desde otros servicios
 
 Cualquier servicio en el VPS puede enviar notificaciones via HTTP:
 
 ```bash
-# Desde un script de deploy
 curl -s -X POST http://127.0.0.1:8080/api/v1/notify \
   -H "Authorization: Bearer $JAIMITO_API_KEY" \
   -H "Content-Type: application/json" \
