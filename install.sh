@@ -1,0 +1,204 @@
+#!/bin/bash
+# =============================================================================
+# jaimito — Instalador automatico
+# =============================================================================
+# Uso:
+#   curl -sL https://raw.githubusercontent.com/objetiva-comercios/objetiva-vps-jaimito/main/install.sh | bash
+#
+# O desde el VPS:
+#   bash install.sh
+#
+# Que hace:
+#   1. Verifica dependencias (git, go 1.24+)
+#   2. Clona o actualiza el repositorio
+#   3. Compila el binario Go
+#   4. Instala en /usr/local/bin/jaimito
+#   5. Crea directorio de datos /var/lib/jaimito
+#   6. Copia config de ejemplo si no existe
+#   7. Instala y activa el servicio systemd
+#   8. Verifica que el servicio este corriendo
+#
+# Requisitos:
+#   - Go 1.24+
+#   - git
+#   - systemd
+#   - sudo
+# =============================================================================
+
+set -euo pipefail
+
+# -- Config ------------------------------------------------------------------
+INSTALL_DIR="${HOME}/proyectos"
+REPO_DIR="${INSTALL_DIR}/objetiva-vps-jaimito"
+REPO_URL="https://github.com/objetiva-comercios/objetiva-vps-jaimito.git"
+BINARY_NAME="jaimito"
+BINARY_DEST="/usr/local/bin/${BINARY_NAME}"
+CONFIG_DIR="/etc/jaimito"
+CONFIG_FILE="${CONFIG_DIR}/config.yaml"
+DATA_DIR="/var/lib/jaimito"
+SERVICE_NAME="jaimito"
+SERVICE_FILE="systemd/jaimito.service"
+HEALTH_URL="http://127.0.0.1:8080/api/v1/health"
+GO_MIN_VERSION="1.24"
+
+# -- Colores -----------------------------------------------------------------
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+info()  { echo -e "${CYAN}[INFO]${NC}  $*"; }
+ok()    { echo -e "${GREEN}[OK]${NC}    $*"; }
+warn()  { echo -e "${YELLOW}[WARN]${NC}  $*"; }
+error() { echo -e "${RED}[ERROR]${NC} $*"; exit 1; }
+
+# -- Banner ------------------------------------------------------------------
+echo ""
+echo "=========================================="
+echo "  jaimito — Instalador"
+echo "  VPS Push Notification Hub"
+echo "=========================================="
+echo ""
+
+# -- Verificar dependencias --------------------------------------------------
+info "Verificando dependencias..."
+
+command -v git >/dev/null 2>&1 || error "git no encontrado. Instalar con: sudo apt install git"
+ok "git encontrado"
+
+command -v go >/dev/null 2>&1 || error "go no encontrado. Instalar Go ${GO_MIN_VERSION}+ desde https://go.dev/dl/"
+
+GO_VERSION=$(go version | grep -oP '\d+\.\d+' | head -1)
+GO_MAJOR=$(echo "$GO_VERSION" | cut -d. -f1)
+GO_MINOR=$(echo "$GO_VERSION" | cut -d. -f2)
+REQ_MAJOR=$(echo "$GO_MIN_VERSION" | cut -d. -f1)
+REQ_MINOR=$(echo "$GO_MIN_VERSION" | cut -d. -f2)
+
+if [ "$GO_MAJOR" -lt "$REQ_MAJOR" ] || { [ "$GO_MAJOR" -eq "$REQ_MAJOR" ] && [ "$GO_MINOR" -lt "$REQ_MINOR" ]; }; then
+    error "Go ${GO_VERSION} encontrado, se requiere ${GO_MIN_VERSION}+"
+fi
+ok "go ${GO_VERSION} encontrado"
+
+command -v systemctl >/dev/null 2>&1 || error "systemctl no encontrado. Este instalador requiere systemd."
+ok "systemd encontrado"
+
+# -- Manejar instalacion previa ----------------------------------------------
+REINSTALL=false
+if [ -d "$REPO_DIR" ]; then
+    warn "Instalacion previa detectada en ${REPO_DIR}"
+    info "Deteniendo servicio si esta corriendo..."
+    sudo systemctl stop "${SERVICE_NAME}" 2>/dev/null || true
+    REINSTALL=true
+
+    info "Actualizando repositorio..."
+    cd "$REPO_DIR"
+    git fetch origin
+    git reset --hard origin/main
+    ok "Repositorio actualizado"
+else
+    # -- Clonar repositorio --------------------------------------------------
+    info "Clonando repositorio..."
+    mkdir -p "$INSTALL_DIR"
+    git clone "$REPO_URL" "$REPO_DIR"
+    cd "$REPO_DIR"
+    ok "Repositorio clonado en ${REPO_DIR}"
+fi
+
+# -- Compilar ----------------------------------------------------------------
+info "Compilando binario Go..."
+cd "$REPO_DIR"
+go build -o "${BINARY_NAME}" ./cmd/jaimito/
+ok "Binario compilado: ${BINARY_NAME}"
+
+# -- Instalar binario --------------------------------------------------------
+info "Instalando binario en ${BINARY_DEST}..."
+sudo cp "${BINARY_NAME}" "${BINARY_DEST}"
+sudo chmod 755 "${BINARY_DEST}"
+ok "Binario instalado"
+
+# -- Crear directorio de datos -----------------------------------------------
+info "Creando directorio de datos ${DATA_DIR}..."
+sudo mkdir -p "${DATA_DIR}"
+ok "Directorio de datos listo"
+
+# -- Config ------------------------------------------------------------------
+if [ ! -f "$CONFIG_FILE" ]; then
+    info "Copiando config de ejemplo a ${CONFIG_FILE}..."
+    sudo mkdir -p "${CONFIG_DIR}"
+    sudo cp configs/config.example.yaml "${CONFIG_FILE}"
+    warn "Config de ejemplo copiada. EDITAR ANTES DE INICIAR:"
+    warn "  sudo nano ${CONFIG_FILE}"
+    warn "  - Configurar telegram.token con tu bot token"
+    warn "  - Configurar channels con los chat_id reales"
+    warn "  - Configurar seed_api_keys con una key real"
+    CONFIG_NEEDS_EDIT=true
+else
+    ok "Config existente preservada en ${CONFIG_FILE}"
+    CONFIG_NEEDS_EDIT=false
+fi
+
+# -- Instalar servicio systemd -----------------------------------------------
+info "Instalando servicio systemd..."
+sudo cp "${SERVICE_FILE}" "/etc/systemd/system/${SERVICE_NAME}.service"
+sudo systemctl daemon-reload
+sudo systemctl enable "${SERVICE_NAME}"
+ok "Servicio ${SERVICE_NAME} instalado y habilitado"
+
+# -- Iniciar servicio --------------------------------------------------------
+if [ "$CONFIG_NEEDS_EDIT" = true ]; then
+    warn "Servicio NO iniciado — editar la config primero:"
+    warn "  sudo nano ${CONFIG_FILE}"
+    warn "  sudo systemctl start ${SERVICE_NAME}"
+else
+    info "Iniciando servicio..."
+    sudo systemctl start "${SERVICE_NAME}"
+
+    # -- Health check --------------------------------------------------------
+    info "Verificando que el servicio este corriendo..."
+    RETRIES=0
+    MAX_RETRIES=10
+    while [ $RETRIES -lt $MAX_RETRIES ]; do
+        if curl -sf "${HEALTH_URL}" >/dev/null 2>&1; then
+            ok "Servicio corriendo y respondiendo en ${HEALTH_URL}"
+            break
+        fi
+        RETRIES=$((RETRIES + 1))
+        sleep 2
+    done
+
+    if [ $RETRIES -eq $MAX_RETRIES ]; then
+        warn "Health check no respondio despues de ${MAX_RETRIES} intentos"
+        warn "Verificar logs: sudo journalctl -u ${SERVICE_NAME} --no-pager -n 30"
+    fi
+fi
+
+# -- Resultado ---------------------------------------------------------------
+echo ""
+echo "=========================================="
+echo "  Instalacion completa"
+echo "=========================================="
+echo ""
+echo -e "${CYAN}Binario:${NC}    ${BINARY_DEST}"
+echo -e "${CYAN}Config:${NC}     ${CONFIG_FILE}"
+echo -e "${CYAN}Base datos:${NC} ${DATA_DIR}/jaimito.db"
+echo -e "${CYAN}Servicio:${NC}   ${SERVICE_NAME}"
+echo ""
+echo -e "${CYAN}Comandos utiles:${NC}"
+echo "  sudo systemctl status ${SERVICE_NAME}     # Estado"
+echo "  sudo journalctl -u ${SERVICE_NAME} -f     # Logs en vivo"
+echo "  sudo systemctl restart ${SERVICE_NAME}     # Reiniciar"
+echo ""
+echo -e "${CYAN}Enviar notificacion:${NC}"
+echo "  export JAIMITO_API_KEY=sk-tu-key-aqui"
+echo "  jaimito send \"Hola desde el VPS\""
+echo "  jaimito send -c deploys -p high \"Deploy exitoso\""
+echo ""
+echo -e "${CYAN}Monitorear cron job:${NC}"
+echo "  jaimito wrap -c cron -- /path/to/script.sh"
+echo ""
+echo -e "${CYAN}Gestionar API keys:${NC}"
+echo "  jaimito keys create --name mi-servicio"
+echo "  jaimito keys list"
+echo "  jaimito keys revoke <id>"
+echo ""

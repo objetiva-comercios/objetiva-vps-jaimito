@@ -380,3 +380,29 @@ curl -s -X POST http://127.0.0.1:8080/api/v1/notify \
   -H "Content-Type: application/json" \
   -d "{\"body\": \"Deploy v$VERSION completado\", \"channel\": \"deploys\"}"
 ```
+
+## Deploy
+
+### Instalacion automatica
+
+```bash
+curl -sL https://raw.githubusercontent.com/objetiva-comercios/objetiva-vps-jaimito/main/install.sh | bash
+```
+
+El script `install.sh` automatiza todo el flujo: verifica dependencias (Go 1.24+, git, systemd), clona el repositorio, compila el binario, lo instala en `/usr/local/bin/jaimito`, copia la config de ejemplo a `/etc/jaimito/config.yaml`, instala el servicio systemd, y ejecuta un health check.
+
+Es idempotente: si detecta una instalacion previa, detiene el servicio, actualiza el repositorio, recompila, y reinicia.
+
+### Actualizacion
+
+```bash
+# Re-ejecutar el instalador (detecta instalacion previa)
+curl -sL https://raw.githubusercontent.com/objetiva-comercios/objetiva-vps-jaimito/main/install.sh | bash
+```
+
+Ver [DEPLOY.md](DEPLOY.md) para documentacion completa de deploy, troubleshooting, y configuracion manual.
+
+## Estado del proyecto
+
+v1.0 MVP completado — todas las fases finalizadas (3 fases, 10 planes, 17/17 requisitos).
+Funcionalidad completa: HTTP API, Telegram dispatch, CLI companion (`send`, `wrap`, `keys`).
