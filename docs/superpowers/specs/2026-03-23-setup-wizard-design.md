@@ -40,10 +40,13 @@ New:
 - `github.com/charmbracelet/bubbles` — Components (textinput, spinner, list)
 - `github.com/charmbracelet/lipgloss` — Styling
 
+New (stdlib):
+- `golang.org/x/term` — detect interactive terminal (`term.IsTerminal()`)
+
 Existing (reused, not reimplemented):
 - `internal/config` — `config.Validate()` for final config validation
 - `internal/telegram` — `ValidateToken()`, `ValidateChats()` for live validation
-- `internal/db` — `CreateKey()` for API key generation with crypto/rand
+- `internal/db` — `GenerateRawKey()` for API key generation (new exported helper, extracted from `CreateKey()`)
 - `go-telegram/bot` — `bot.SendMessage()` for test notification
 
 ### State Machine
@@ -55,21 +58,35 @@ Welcome → DetectConfig → BotToken → ChannelGeneral → ChannelsExtra
 → Server → Database → APIKey → Summary → WriteConfig → TestNotification → Done
 ```
 
-Each step implements:
+There are 8 user-visible steps (shown as "Step N/8") and 12 internal states. Internal-only states (Welcome, DetectConfig, WriteConfig, TestNotification, Done) don't display a step number.
+
+| Visible Step | Internal States |
+|---|---|
+| — | Welcome, DetectConfig |
+| 1/8 Bot Token | BotToken |
+| 2/8 Canal general | ChannelGeneral |
+| 3/8 Canales extra | ChannelsExtra |
+| 4/8 Servidor | Server |
+| 5/8 Base de datos | Database |
+| 6/8 API Key | APIKey |
+| 7/8 Resumen | Summary |
+| — | WriteConfig, TestNotification, Done |
+
+Each step is a sub-component of the main wizard model (not a `tea.Model` itself). Steps write directly into `*SetupData` instead of returning `any`:
 
 ```go
 type Step interface {
     Init() tea.Cmd
-    Update(msg tea.Msg) (Step, tea.Cmd)
+    Update(msg tea.Msg, data *SetupData) tea.Cmd
     View() string
-    Result() any
+    Done() bool
 }
 ```
 
 The main wizard model holds:
 - `steps []Step` — ordered list of steps
 - `current int` — index of active step
-- `data *SetupData` — accumulated configuration values
+- `data *SetupData` — accumulated configuration values, mutated by each step directly
 
 ```go
 type SetupData struct {
@@ -98,7 +115,7 @@ type ChannelData struct {
 
 All validations run as `tea.Cmd` (async) so the UI stays responsive with a spinner:
 
-- **Bot token**: calls `telegram.ValidateToken(ctx, token)` — returns bot info or error
+- **Bot token**: calls a new `telegram.ValidateTokenWithInfo(ctx, token)` that returns `(*bot.Bot, BotInfo, error)` where `BotInfo` has `Username` and `DisplayName` fields. Internally this calls `bot.New()` (which does getMe) and then extracts the user info. This is needed because the current `ValidateToken()` returns only the bot instance without the getMe response data.
 - **Chat ID**: calls `bot.GetChat()` via go-telegram/bot — returns chat name/type or error
 - **Final config**: calls `config.Validate()` on the generated config struct before writing
 
@@ -106,15 +123,9 @@ On validation failure: show the error, keep the current step active, allow the u
 
 ### API Key Generation
 
-Uses `internal/db.CreateKey()` indirectly — the same `crypto/rand` 32-byte + hex + `sk-` prefix logic, but without DB insertion (the key goes into the YAML as a seed key). The wizard generates the key in-process:
+Uses a new `db.GenerateRawKey() string` function extracted from the existing `CreateKey()` logic (crypto/rand 32-byte + hex + `sk-` prefix). Both `CreateKey()` and the wizard call this shared function — no duplication.
 
-```go
-bytes := make([]byte, 32)
-crypto/rand.Read(bytes)
-key := "sk-" + hex.EncodeToString(bytes)
-```
-
-The raw key is displayed once and written to `seed_api_keys` in the config. On first server startup, `SeedKeys()` hashes and inserts it.
+The wizard calls `db.GenerateRawKey()`, displays the raw key once, and writes it to `seed_api_keys` in the config with name `"default"`. On first server startup, `SeedKeys()` hashes and inserts it.
 
 ### Config Writing
 
@@ -128,14 +139,16 @@ Creates parent directory `/etc/jaimito/` if it doesn't exist.
 
 Sends directly via the bot API without starting the server:
 
-1. Create bot instance (already validated in step 2)
-2. Format a test message using `telegram.FormatMessage()`:
-   - Channel: "general"
-   - Priority: "normal"
-   - Title: "jaimito setup"
-   - Body: "Setup completado — las notificaciones funcionan correctamente"
-3. Send via `bot.SendMessage()` to the general channel's chat_id
+1. Reuse the bot instance already validated in the BotToken step
+2. Build the test message text directly in the wizard (hardcoded string with emoji, no dependency on `db.Message` or `telegram.FormatMessage`):
+   ```
+   🟡 *jaimito setup*
+   Setup completado — las notificaciones funcionan correctamente
+   ```
+3. Send via `bot.SendMessage()` with `ParseMode: "MarkdownV2"` to the general channel's chat_id
 4. Report success or failure
+
+Note: we don't use `telegram.FormatMessage()` because it requires a `*db.Message` struct with DB-specific fields. A hardcoded MarkdownV2 string is simpler and avoids coupling the wizard to the `db` package for this one-time message.
 
 ### install.sh Integration
 
@@ -144,11 +157,13 @@ Replace the current config.example.yaml copy block with:
 ```bash
 if [ ! -f "$CONFIG_FILE" ]; then
     info "Iniciando setup interactivo..."
-    jaimito setup --config "$CONFIG_FILE"
+    jaimito setup --config "$CONFIG_FILE" < /dev/tty
 else
     ok "Config existente preservada en ${CONFIG_FILE}"
 fi
 ```
+
+**Critical: `< /dev/tty`** is required because install.sh may run via `curl | bash`, which occupies stdin with the pipe. Redirecting stdin from `/dev/tty` gives bubbletea access to the actual terminal for keyboard input.
 
 Since install.sh runs as root, the wizard has full permissions to write anywhere.
 
@@ -225,7 +240,7 @@ Text input for database path, pre-filled with `/var/lib/jaimito/jaimito.db`. Ver
 
 ### Step 7: API Key
 
-No user input — auto-generates the key and displays it in a highlighted box. Shows a warning that it cannot be recovered. Prompts "¿La copiaste? (s/n)" and only advances on "s".
+No user input — auto-generates the key via `db.GenerateRawKey()` and displays it in a highlighted box. The key is written to `seed_api_keys` with name `"default"`. Shows a warning that it cannot be recovered. Prompts "¿La copiaste? (s/n)" and only advances on "s".
 
 If editing existing config, shows the existing seed key name and asks if the user wants to generate a new one or keep the existing.
 
@@ -240,7 +255,7 @@ Renders a bordered table with all configured values:
 
 Three options: Guardar / Volver a revisar / Cancelar.
 
-"Volver a revisar" restarts from step 2 with all current values pre-filled.
+"Volver a revisar" shows a step selector: the user picks which step to jump back to (Bot Token, Canales, Servidor, etc.), and navigates directly there with all current values pre-filled. This avoids forcing the user through the entire wizard again to change one field.
 
 ### Step 9: Write Config + Test + Done
 
@@ -248,9 +263,9 @@ Writes config YAML, shows path and permissions. Offers test notification (y/n). 
 
 ## Edge Cases
 
-- **Ctrl+C at any point**: bubbletea handles SIGINT gracefully, exits cleanly
+- **Ctrl+C at any point**: bubbletea handles SIGINT gracefully, exits cleanly. Async validations (Telegram API calls) use a `context.Context` derived from the program, which is cancelled on quit — no dangling HTTP requests.
 - **Terminal too narrow**: lipgloss gracefully degrades, wrapping text
-- **Non-interactive terminal** (piped stdin): detect with `term.IsTerminal()`, print error suggesting interactive mode
+- **Non-interactive terminal** (piped stdin): detect with `golang.org/x/term.IsTerminal(int(os.Stdin.Fd()))` before launching bubbletea. If non-interactive, print error: "jaimito setup requiere una terminal interactiva. Ejecutar directamente, no via pipe." and exit 1.
 - **Bot not added to chat**: getChat fails — error message explains "Asegurate de que el bot esté agregado al grupo"
 - **Same chat_id for multiple channels**: valid and common — the wizard handles this by showing "Mismo chat que general" and skipping re-validation
 - **Existing config with invalid values**: when editing, loads values but re-validates everything during the wizard flow
