@@ -26,7 +26,24 @@ Every event that happens on the VPS gets reliably captured and delivered to Tele
 
 ### Active
 
-(Next milestone requirements to be defined via `/gsd:new-milestone`)
+- [ ] Interactive CLI setup wizard (`jaimito setup`) with bubbletea TUI
+- [ ] Live validation of Telegram bot token and chat IDs against API
+- [ ] Auto-generation of API key and config YAML writing
+- [ ] Test notification to prove setup works before finishing
+- [ ] install.sh integration (replaces manual config.example.yaml copy)
+
+## Current Milestone: v1.1 Setup Wizard
+
+**Goal:** Eliminate the manual config.yaml editing barrier with an interactive CLI wizard that guides users through setup, validates everything live, and sends a test notification.
+
+**Target features:**
+- `jaimito setup` cobra subcommand with bubbletea TUI
+- Step-by-step wizard: bot token → channels → server → db → API key → summary
+- Live Telegram API validation (bot token, chat IDs)
+- Auto-generated API key with `db.GenerateRawKey()`
+- Config YAML generation and writing with proper permissions
+- Test notification via bot API
+- install.sh integration with `/dev/tty` redirect for `curl | bash`
 
 ### Out of Scope
 
@@ -77,4 +94,4 @@ Every event that happens on the VPS gets reliably captured and delivered to Tele
 | API/dispatcher separation | API enqueues to DB, dispatcher reads independently | ✓ Good — clean boundary, testable |
 
 ---
-*Last updated: 2026-03-23 after v1.0 milestone*
+*Last updated: 2026-03-23 after v1.1 milestone start*
