@@ -2,7 +2,7 @@
 
 ## What This Is
 
-jaimito is a lightweight, self-hosted notification hub that centralizes all alerts generated on a VPS (service events, cron job results, application errors, health checks) and dispatches them to Telegram via a single Go binary backed by SQLite. Services send messages through a webhook HTTP API or a CLI companion; jaimito queues, persists, and delivers them with automatic retries.
+jaimito is a lightweight, self-hosted notification hub that centralizes all alerts generated on a VPS (service events, cron job results, application errors, health checks) and dispatches them to Telegram via a single Go binary backed by SQLite. Services send messages through a webhook HTTP API or a CLI companion (`jaimito send`, `jaimito wrap`); jaimito queues, persists, and delivers them with automatic retries.
 
 ## Core Value
 
@@ -12,65 +12,69 @@ Every event that happens on the VPS gets reliably captured and delivered to Tele
 
 ### Validated
 
-(None yet — ship to validate)
+- ✓ HTTP webhook endpoint (`POST /api/v1/notify`) with Bearer token auth — v1.0
+- ✓ CLI companion with `jaimito send` and `jaimito wrap` commands — v1.0
+- ✓ Telegram dispatcher with priority-based emoji formatting — v1.0
+- ✓ SQLite persistence with WAL mode for the message queue — v1.0
+- ✓ Channel-based message routing with predefined channels — v1.0
+- ✓ Priority system (critical/high/normal/low) with emoji differentiation — v1.0
+- ✓ API key management via CLI (`jaimito keys create/list/revoke`) — v1.0
+- ✓ YAML configuration file (`/etc/jaimito/config.yaml`) — v1.0
+- ✓ Health check endpoint (`GET /api/v1/health`) — v1.0
+- ✓ Automatic retries with exponential backoff for failed deliveries — v1.0
+- ✓ `jaimito wrap` captures command output and sends notification on failure — v1.0
 
 ### Active
 
-- [ ] HTTP webhook endpoint (`POST /api/v1/notify`) with Bearer token auth
-- [ ] CLI companion with `jaimito send` and `jaimito wrap` commands
-- [ ] Telegram dispatcher with priority-based emoji formatting
-- [ ] SQLite persistence with WAL mode for the message queue
-- [ ] Channel-based message routing with predefined channels
-- [ ] Priority system (critical/high/normal/low) with behavioral differences
-- [ ] API key management via CLI (`jaimito keys create/list/revoke`)
-- [ ] YAML configuration file (`/etc/jaimito/config.yaml`)
-- [ ] Health check endpoint (`GET /api/v1/health`)
-- [ ] Automatic retries with exponential backoff for failed deliveries
-- [ ] `jaimito wrap` captures command output and sends notification on failure
+(Next milestone requirements to be defined via `/gsd:new-milestone`)
 
 ### Out of Scope
 
-- Email/SMTP dispatcher — deferred to v0.2
-- HTTP generic/cURL dispatcher — deferred to v0.3
-- File watcher ingestor — deferred to v0.4
-- Systemd watcher — deferred to v2
-- Dashboard web — deferred to v2
-- Message grouping/digest — deferred to v0.3
-- Deduplication — deferred to v0.3
-- Rate limiting — deferred to v0.2
-- Quiet hours — deferred to v0.2
-- Query API (list messages, stats) — deferred to v0.4
+- Email/SMTP dispatcher — deferred to future milestone
+- HTTP generic/cURL dispatcher — deferred to future milestone
+- File watcher ingestor — deferred to future milestone
+- Systemd watcher — deferred to v2+
+- Dashboard web — anti-feature: Telegram IS the history
+- Message grouping/digest — deferred to future milestone
+- Deduplication — deferred to future milestone
+- Rate limiting — deferred to future milestone
+- Quiet hours — deferred to future milestone
+- Query API (list messages, stats) — deferred to future milestone
 - WhatsApp/PagerDuty/Matrix dispatchers — deferred to v2+
 
 ## Context
 
+- Shipped v1.0 MVP with 2,090 LOC Go across 62 files
+- Tech stack: Go 1.24, modernc.org/sqlite (CGO-free), chi v5, cobra, go-telegram/bot
 - Runs on the same VPS it monitors (single machine deployment)
-- Intended for a personal VPS with multiple services and cron jobs
-- Currently notifications are fragmented: each service has its own alerting logic (or none)
-- Cron jobs fail silently — this is the primary pain point
-- The PRD specifies a comprehensive v1.0 vision; this project starts with MVP (v0.1) scope
-- Go chosen for: single binary distribution, low memory footprint (<50MB), native concurrency
-- SQLite chosen for: zero external dependencies, trivial backup, sufficient throughput (hundreds of messages/hour)
+- Primary pain point solved: cron jobs no longer fail silently (`jaimito wrap`)
+- Single binary, zero external dependencies, ~50MB memory footprint
+- 16 unit tests passing
 
 ## Constraints
 
 - **Language**: Go — single binary, no runtime dependencies
-- **Database**: SQLite with CGo — no external database servers
+- **Database**: SQLite via modernc.org/sqlite (CGO-free) — no external database servers
 - **Deployment**: systemd unit on Linux (amd64 primary, arm64 optional)
 - **Memory**: Target <50MB in normal operation
 - **Config**: Single YAML file at `/etc/jaimito/config.yaml`
-- **Network**: Listens on `127.0.0.1:8787` by default (behind reverse proxy for external access)
-- **Auth**: Bearer tokens with `sk-` prefix, stored in SQLite
+- **Network**: Listens on `127.0.0.1:8080` by default (behind reverse proxy for external access)
+- **Auth**: Bearer tokens with `sk-` prefix, SHA-256 hashed, stored in SQLite
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Go over Rust/Python | Single binary, low memory, mature ecosystem for HTTP+SQLite | — Pending |
-| SQLite over Postgres/Redis | Zero dependencies, file-level backup, sufficient for VPS scale | — Pending |
-| MVP scope (v0.1) first | Ship fast, validate the core loop (ingest → queue → deliver) before adding complexity | — Pending |
-| CLI includes `wrap` in MVP | Cron monitoring is the primary pain point — `wrap` is the killer feature | — Pending |
-| Same VPS deployment | Simplicity; separation can come later if jaimito proves valuable | — Pending |
+| Go over Rust/Python | Single binary, low memory, mature ecosystem for HTTP+SQLite | ✓ Good — 2,090 LOC, clean build, fast iteration |
+| SQLite over Postgres/Redis | Zero dependencies, file-level backup, sufficient for VPS scale | ✓ Good — WAL mode, single-writer pattern works |
+| MVP scope (v0.1→v1.0) first | Ship fast, validate the core loop (ingest → queue → deliver) | ✓ Good — 5 days to full MVP |
+| CLI includes `wrap` in MVP | Cron monitoring is the primary pain point — `wrap` is the killer feature | ✓ Good — killer feature delivered |
+| Same VPS deployment | Simplicity; separation can come later if jaimito proves valuable | ✓ Good — single binary, trivial deploy |
+| modernc.org/sqlite (CGO-free) | Single-binary cross-compile without CGO dependency chain | ✓ Good — no build complications |
+| cobra for CLI | Industry standard, subcommand support, persistent flags | ✓ Good — clean CLI architecture |
+| chi v5 for HTTP | Lightweight, stdlib-compatible, good middleware ecosystem | ✓ Good — clean routing, middleware composition |
+| Single-writer SQLite pool | SetMaxOpenConns(1) prevents SQLITE_BUSY in WAL mode | ✓ Good — no concurrency issues |
+| API/dispatcher separation | API enqueues to DB, dispatcher reads independently | ✓ Good — clean boundary, testable |
 
 ---
-*Last updated: 2026-02-20 after initialization*
+*Last updated: 2026-03-23 after v1.0 milestone*
