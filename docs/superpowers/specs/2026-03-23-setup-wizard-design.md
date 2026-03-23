@@ -40,7 +40,7 @@ New:
 - `github.com/charmbracelet/bubbles` — Components (textinput, spinner, list)
 - `github.com/charmbracelet/lipgloss` — Styling
 
-New (stdlib):
+New (golang.org/x):
 - `golang.org/x/term` — detect interactive terminal (`term.IsTerminal()`)
 
 Existing (reused, not reimplemented):
@@ -58,18 +58,18 @@ Welcome → DetectConfig → BotToken → ChannelGeneral → ChannelsExtra
 → Server → Database → APIKey → Summary → WriteConfig → TestNotification → Done
 ```
 
-There are 8 user-visible steps (shown as "Step N/8") and 12 internal states. Internal-only states (Welcome, DetectConfig, WriteConfig, TestNotification, Done) don't display a step number.
+There are 7 user-visible steps (shown as "Step N/7") and 12 internal states. Internal-only states (Welcome, DetectConfig, WriteConfig, TestNotification, Done) don't display a step number.
 
 | Visible Step | Internal States |
 |---|---|
 | — | Welcome, DetectConfig |
-| 1/8 Bot Token | BotToken |
-| 2/8 Canal general | ChannelGeneral |
-| 3/8 Canales extra | ChannelsExtra |
-| 4/8 Servidor | Server |
-| 5/8 Base de datos | Database |
-| 6/8 API Key | APIKey |
-| 7/8 Resumen | Summary |
+| 1/7 Bot Token | BotToken |
+| 2/7 Canal general | ChannelGeneral |
+| 3/7 Canales extra | ChannelsExtra |
+| 4/7 Servidor | Server |
+| 5/7 Base de datos | Database |
+| 6/7 API Key | APIKey |
+| 7/7 Resumen | Summary |
 | — | WriteConfig, TestNotification, Done |
 
 Each step is a sub-component of the main wizard model (not a `tea.Model` itself). Steps write directly into `*SetupData` instead of returning `any`:
