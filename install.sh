@@ -67,18 +67,34 @@ info "Verificando dependencias..."
 command -v git >/dev/null 2>&1 || error "git no encontrado. Instalar con: sudo apt install git"
 ok "git encontrado"
 
-command -v go >/dev/null 2>&1 || error "go no encontrado. Instalar Go ${GO_MIN_VERSION}+ desde https://go.dev/dl/"
+GO_INSTALLED=true
+command -v go >/dev/null 2>&1 || GO_INSTALLED=false
 
-GO_VERSION=$(go version | grep -oP '\d+\.\d+' | head -1)
-GO_MAJOR=$(echo "$GO_VERSION" | cut -d. -f1)
-GO_MINOR=$(echo "$GO_VERSION" | cut -d. -f2)
-REQ_MAJOR=$(echo "$GO_MIN_VERSION" | cut -d. -f1)
-REQ_MINOR=$(echo "$GO_MIN_VERSION" | cut -d. -f2)
+if [ "$GO_INSTALLED" = true ]; then
+    GO_VERSION=$(go version | grep -oP '\d+\.\d+' | head -1)
+    GO_MAJOR=$(echo "$GO_VERSION" | cut -d. -f1)
+    GO_MINOR=$(echo "$GO_VERSION" | cut -d. -f2)
+    REQ_MAJOR=$(echo "$GO_MIN_VERSION" | cut -d. -f1)
+    REQ_MINOR=$(echo "$GO_MIN_VERSION" | cut -d. -f2)
 
-if [ "$GO_MAJOR" -lt "$REQ_MAJOR" ] || { [ "$GO_MAJOR" -eq "$REQ_MAJOR" ] && [ "$GO_MINOR" -lt "$REQ_MINOR" ]; }; then
-    error "Go ${GO_VERSION} encontrado, se requiere ${GO_MIN_VERSION}+"
+    if [ "$GO_MAJOR" -lt "$REQ_MAJOR" ] || { [ "$GO_MAJOR" -eq "$REQ_MAJOR" ] && [ "$GO_MINOR" -lt "$REQ_MINOR" ]; }; then
+        warn "Go ${GO_VERSION} encontrado, se requiere ${GO_MIN_VERSION}+"
+        GO_INSTALLED=false
+    else
+        ok "go ${GO_VERSION} encontrado"
+    fi
 fi
-ok "go ${GO_VERSION} encontrado"
+
+if [ "$GO_INSTALLED" = false ]; then
+    GO_TAR="go${GO_MIN_VERSION}.1.linux-$(dpkg --print-architecture 2>/dev/null || echo amd64).tar.gz"
+    info "Instalando Go ${GO_MIN_VERSION}..."
+    curl -sL "https://go.dev/dl/${GO_TAR}" | sudo tar -C /usr/local -xzf -
+    export PATH=$PATH:/usr/local/go/bin
+    if ! grep -q '/usr/local/go/bin' "$HOME/.bashrc" 2>/dev/null; then
+        echo 'export PATH=$PATH:/usr/local/go/bin' >> "$HOME/.bashrc"
+    fi
+    ok "Go $(go version | grep -oP '\d+\.\d+\.\d+' | head -1) instalado"
+fi
 
 command -v systemctl >/dev/null 2>&1 || error "systemctl no encontrado. Este instalador requiere systemd."
 ok "systemd encontrado"
