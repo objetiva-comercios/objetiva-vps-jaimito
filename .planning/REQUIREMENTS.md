@@ -73,24 +73,24 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| WIZ-01 | — | Pending |
-| WIZ-02 | — | Pending |
-| WIZ-03 | — | Pending |
-| TELE-01 | — | Pending |
-| TELE-02 | — | Pending |
-| TELE-03 | — | Pending |
-| CONF-01 | — | Pending |
-| CONF-02 | — | Pending |
-| CONF-03 | — | Pending |
-| CONF-04 | — | Pending |
-| TEST-01 | — | Pending |
-| INST-01 | — | Pending |
+| WIZ-01 | Phase 4 | Pending |
+| WIZ-02 | Phase 4 | Pending |
+| WIZ-03 | Phase 4 | Pending |
+| TELE-01 | Phase 5 | Pending |
+| TELE-02 | Phase 5 | Pending |
+| TELE-03 | Phase 5 | Pending |
+| CONF-01 | Phase 6 | Pending |
+| CONF-02 | Phase 6 | Pending |
+| CONF-03 | Phase 6 | Pending |
+| CONF-04 | Phase 6 | Pending |
+| TEST-01 | Phase 7 | Pending |
+| INST-01 | Phase 7 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 12 total
-- Mapped to phases: 0
-- Unmapped: 12
+- Mapped to phases: 12
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-24*
-*Last updated: 2026-03-24 after initial definition*
+*Last updated: 2026-03-24 after roadmap creation*
