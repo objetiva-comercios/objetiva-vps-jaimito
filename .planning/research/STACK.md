@@ -6,7 +6,91 @@
 
 ---
 
-## Recommended Stack
+## v1.1 Additions: TUI Setup Wizard
+
+*Added 2026-03-23 — new dependencies for `jaimito setup` command only.*
+
+### New Dependencies
+
+| Technology | Version | Purpose | Why Recommended |
+|------------|---------|---------|-----------------|
+| `charm.land/bubbletea/v2` | v2.0.2 | TUI event loop and Model/Update/View framework | v2 is current stable (released Feb-Mar 2025/2026 via charm.land vanity domain). v1 (github.com path) is maintenance-only since Sep 2024. Use v2 for all new code — do not mix versions. |
+| `charm.land/bubbles/v2` | v2.0.0 | Pre-built TUI components (textinput, spinner, list) | Official component library for bubbletea v2. Required v2 because types are incompatible with bubbletea v1. Provides textinput, spinner, and list — the three components needed by the wizard. |
+| `charm.land/lipgloss/v2` | v2.0.2 | Terminal styling — colors, borders, padding, layout | `Style.Render()` still returns `string` in v2. Value type (immutable). Handles color downsampling automatically by terminal capability. Correct choice for the cyan/green/red/yellow theme in the spec. |
+| `golang.org/x/term` | v0.41.0 | Detect interactive terminal before launching bubbletea | `term.IsTerminal(int(os.Stdin.Fd()))` — needed to abort gracefully when stdin is a pipe (curl \| bash). Official stdlib-adjacent package. Already transitively available via `golang.org/x/sys` in go.mod. |
+
+### Installation
+
+```bash
+go get charm.land/bubbletea/v2@v2.0.2
+go get charm.land/bubbles/v2@v2.0.0
+go get charm.land/lipgloss/v2@v2.0.2
+go get golang.org/x/term@v0.41.0
+```
+
+### Critical: v1 vs v2 — Always Use v2
+
+The charmbracelet ecosystem has two generations with incompatible import paths:
+
+| Generation | Import Path | Status |
+|------------|------------|--------|
+| v1 | `github.com/charmbracelet/bubbletea` | Maintenance-only (last: Sep 2024) |
+| v2 | `charm.land/bubbletea/v2` | Current stable (v2.0.2, Mar 2026) |
+
+Do NOT mix v1 and v2 — types are incompatible. bubbles v2 uses `tea.KeyPressMsg`; bubbletea v1 uses `tea.KeyMsg`. They will not compile together.
+
+### v2 API Differences That Affect the Design Spec
+
+1. **`Model.View()` returns `tea.View`** (not `string`). The spec's `Step.View() string` is an internal helper interface, not `tea.Model`. Steps return strings; the main wizard assembles them into `tea.View`. This is fully compatible.
+
+2. **Key messages**: Use `tea.KeyPressMsg` instead of `tea.KeyMsg` in all `Update()` switches.
+
+3. **`textinput.New()`**: Uses option functions in v2. Verify exact API with pkg.go.dev before coding — constructors changed from struct initialization to functional options.
+
+4. **`spinner.New()`**: Takes `Option` functions: `spinner.New(spinner.WithSpinner(spinner.Dot), spinner.WithStyle(...))`.
+
+### What NOT to Add
+
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| `github.com/charmbracelet/bubbletea` (v1) | Maintenance-only; type-incompatible with bubbles v2 and lipgloss v2 | `charm.land/bubbletea/v2` |
+| `github.com/charmbracelet/huh` | Higher-level form abstraction loses flexibility for non-linear navigation (jump-to-step) required by the spec | Raw bubbletea v2 + bubbles components |
+| `github.com/AlecAivazis/survey` | Blocking stdin reads; incompatible with bubbletea's event loop | `charm.land/bubbles/v2/textinput` |
+| `github.com/mattn/go-isatty` | Already an indirect dep via modernc.org/sqlite; direct dependency not needed; x/term is the official package | `golang.org/x/term` |
+
+### Integration Points in Existing Codebase
+
+**cobra entry** (`cmd/jaimito/setup.go`): Check `term.IsTerminal()` before `tea.NewProgram()`. If non-interactive, print error and `os.Exit(1)`.
+
+**Validation** (`internal/telegram`): Add `ValidateTokenWithInfo()` returning bot username + display name. Wrap all validation calls as `tea.Cmd` — never block in `Update()`.
+
+**DB key generation** (`internal/db`): Extract `GenerateRawKey() string` from `CreateKey()`. Pure function, no DB dependency. Wizard calls it directly; `CreateKey()` delegates internally.
+
+**Config writing** (`cmd/jaimito/setup/config.go`): Marshal config struct with `gopkg.in/yaml.v3` (already in go.mod). Write to `--config` path with `os.WriteFile(..., 0600)`.
+
+### Version Compatibility
+
+| Package | Version | Notes |
+|---------|---------|-------|
+| `charm.land/bubbletea/v2` | v2.0.2 | Requires bubbles v2.0.0+ and lipgloss v2 for type compatibility |
+| `charm.land/bubbles/v2` | v2.0.0 | Go 1.21+ required; Go 1.24 fully compatible |
+| `charm.land/lipgloss/v2` | v2.0.2 | Color type changed from `string` to `image/color.Color` in v2; use `lipgloss.Color("#00BFFF")` which still works |
+| `golang.org/x/term` | v0.41.0 | `golang.org/x/sys` already in go.mod (indirect dep); x/term builds on it, no conflict |
+
+### Sources (TUI section)
+
+- Go module proxy (`proxy.golang.org`, `charm.land`) — version timestamps verified 2026-03-23 — HIGH confidence
+- `pkg.go.dev/charm.land/bubbletea/v2` — Model interface, `tea.View` return type confirmed — HIGH confidence
+- `pkg.go.dev/charm.land/bubbles/v2/textinput` — v2 textinput API — HIGH confidence
+- `pkg.go.dev/charm.land/bubbles/v2/spinner` — v2 spinner API — HIGH confidence
+- `pkg.go.dev/charm.land/lipgloss/v2` — `Style.Render()` returns `string` confirmed — HIGH confidence
+- `pkg.go.dev/golang.org/x/term` — `IsTerminal()` API — HIGH confidence
+- `github.com/charmbracelet/bubbletea/discussions/1374` — v2 rationale, new-project recommendation — MEDIUM confidence
+- `github.com/charmbracelet/bubbles/blob/main/UPGRADE_GUIDE_V2.md` — breaking changes v1→v2 — HIGH confidence
+
+---
+
+## Recommended Stack (v1.0 — Existing)
 
 ### Core Technologies
 
@@ -56,6 +140,12 @@ go get go.yaml.in/yaml/v3@v3.0.4
 # Test dependencies
 go get github.com/stretchr/testify@v1.11.1
 
+# v1.1: TUI wizard
+go get charm.land/bubbletea/v2@v2.0.2
+go get charm.land/bubbles/v2@v2.0.0
+go get charm.land/lipgloss/v2@v2.0.2
+go get golang.org/x/term@v0.41.0
+
 # Verify
 go mod tidy
 ```
@@ -74,6 +164,7 @@ go mod tidy
 | `go.yaml.in/yaml/v3` | `gopkg.in/yaml.v3` | Never. `gopkg.in/yaml.v3` is unmaintained. `go.yaml.in/yaml/v3` is the upstream continuation with identical API. |
 | `pressly/goose/v3` | `golang-migrate` | golang-migrate does not wrap individual statements in transactions—a partial migration leaves the database inconsistent. Goose wraps each migration file in a transaction. For an embedded use case (no separate CLI needed), goose is more ergonomic. |
 | `log/slog` (stdlib) | `uber-go/zap` or `rs/zerolog` | Only if benchmarks show slog overhead is a problem, which at jaimito's scale (<50MB target, low notification volume) it will not be. Avoid external logging dependencies when stdlib suffices. |
+| `charm.land/bubbletea/v2` | `github.com/charmbracelet/huh` | huh provides a higher-level form abstraction that works well for linear wizards. Avoid here because the spec requires non-linear navigation (jump-to-step from summary). Raw bubbletea gives full control. |
 
 ---
 
@@ -89,6 +180,7 @@ go mod tidy
 | `GORM` | ORM unnecessary for a 2-table schema; hides SQL behavior; GORM's auto-migration is not safe for production schema changes. | Direct `database/sql` queries + goose for migrations |
 | `gorilla/mux` | Unmaintained (archived). chi superseded it as the community standard. | `go-chi/chi/v5` |
 | External message queue (Redis, RabbitMQ) | Violates the zero-external-dependencies constraint. SQLite WAL mode handles the queue durably at jaimito's scale. | SQLite `messages` table as the queue |
+| `github.com/charmbracelet/bubbletea` (v1 path) | Maintenance-only since Sep 2024; type-incompatible with bubbles v2 and lipgloss v2 | `charm.land/bubbletea/v2` |
 
 ---
 
@@ -113,6 +205,10 @@ go mod tidy
 - Switch from modernc.org/sqlite to `github.com/tursodatabase/libsql-client-go` (SQLite-compatible distributed DB)
 - No application layer changes—same `database/sql` interface
 
+**If wizard needs to run in a non-standard terminal (e.g., tmux, screen):**
+- bubbletea v2 handles terminal detection via `TERM` environment; no special handling needed
+- `/dev/tty` redirect in install.sh handles the curl | bash case at the shell level
+
 ---
 
 ## Version Compatibility
@@ -126,6 +222,10 @@ go mod tidy
 | `github.com/spf13/cobra@v1.10.2` | Go >= 1.21 | Migrated to `go.yaml.in/yaml/v3` internally in this version |
 | `go.yaml.in/yaml/v3@v3.0.4` | Go >= 1.18 | v4 tagged but no migration guide published yet; stick with v3 |
 | `github.com/google/uuid@v1.6.0` | Go >= 1.17 | `NewV7()` added in v1.6.0 (Jan 2024) |
+| `charm.land/bubbletea/v2@v2.0.2` | Go >= 1.21 | Requires bubbles v2 and lipgloss v2 for type-safe composition |
+| `charm.land/bubbles/v2@v2.0.0` | bubbletea v2 only | Type-incompatible with bubbletea v1 |
+| `charm.land/lipgloss/v2@v2.0.2` | bubbletea v1 or v2 | Styling only; `Render()` returns string; no bubbletea type dependency |
+| `golang.org/x/term@v0.41.0` | All Go versions | Uses `golang.org/x/sys` internally; already transitive dep in go.mod |
 
 ---
 
@@ -141,13 +241,17 @@ go mod tidy
 - `pkg.go.dev/go.yaml.in/yaml/v3` — v3.0.4 published Jun 29, 2025 (HIGH confidence, verified)
 - `go.dev/doc/devel/release` — Go 1.26 released Feb 10, 2026 (HIGH confidence, official Go site)
 - `github.com/golangci/golangci-lint/releases` — v2.10.1 released Feb 17, 2026 (HIGH confidence, verified)
-- `go-chi/chi releases page` — v5.2.5 release notes confirmed (HIGH confidence)
-- `spf13/cobra releases page` — v1.10.2 release notes, yaml.v3 migration confirmed (HIGH confidence)
+- Go module proxy `proxy.golang.org` + `charm.land` — bubbletea v2.0.2, bubbles v2.0.0, lipgloss v2.0.2, x/term v0.41.0 timestamps verified 2026-03-23 (HIGH confidence)
+- `pkg.go.dev/charm.land/bubbletea/v2` — Model interface, `tea.View` return type (HIGH confidence)
+- `pkg.go.dev/charm.land/bubbles/v2/textinput` — v2 textinput API (HIGH confidence)
+- `pkg.go.dev/charm.land/bubbles/v2/spinner` — v2 spinner API (HIGH confidence)
+- `pkg.go.dev/charm.land/lipgloss/v2` — `Style.Render()` returns `string` confirmed (HIGH confidence)
+- `github.com/charmbracelet/bubbletea/discussions/1374` — v2 rationale and recommendation (MEDIUM confidence)
+- `github.com/charmbracelet/bubbles/blob/main/UPGRADE_GUIDE_V2.md` — v1→v2 breaking changes (HIGH confidence)
 - `alexedwards.net/blog/which-go-router-should-i-use` — chi vs stdlib analysis 2025 (MEDIUM confidence, respected Go author)
-- `github.com/go-task/task/issues/2171` — gopkg.in/yaml.v3 unmaintained status (MEDIUM confidence, community issue thread)
 - `sqlite.org/wal.html` — WAL mode concurrency characteristics (HIGH confidence, official SQLite docs)
 
 ---
 
 *Stack research for: jaimito — VPS push notification hub in Go*
-*Researched: 2026-02-20*
+*Researched: 2026-02-20 (v1.0 base stack) | Updated: 2026-03-23 (v1.1 TUI additions)*
