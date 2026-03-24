@@ -18,7 +18,7 @@
 
 ### 🚧 v1.1 Setup Wizard (In Progress)
 
-**Milestone Goal:** Eliminar la barrera del config.yaml manual con un wizard interactivo que guía al operador paso a paso, valida todo en vivo contra la API de Telegram, y envía una notificación de test antes de terminar.
+**Milestone Goal:** Eliminar la barrera del config.yaml manual con un wizard interactivo que guia al operador paso a paso, valida todo en vivo contra la API de Telegram, y envia una notificacion de test antes de terminar.
 
 - [ ] **Phase 4: Wizard Scaffold** — El operador puede ejecutar `jaimito setup` y el wizard arranca, detecta configs existentes y aborta en terminales no-interactivas
 - [ ] **Phase 5: Validacion Telegram** — El operador ingresa bot token y chat IDs con validacion en vivo contra la API de Telegram en cada paso
@@ -36,11 +36,11 @@
   2. El wizard detecta config existente en `/etc/jaimito/config.yaml` y ofrece tres opciones: editar, crear desde cero, o cancelar
   3. Ejecutar `jaimito setup` sin terminal (ej. en pipe o cron) produce un error descriptivo y exit code 1 en lugar de un panic o hang
   4. Las dependencias bubbletea v2, bubbles v2, lipgloss v2 y golang.org/x/term estan integradas en el modulo Go sin errores de compilacion
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 04-01: Agregar dependencias bubbletea v2 y scaffold del comando `setup` con cobra
-- [ ] 04-02: Implementar deteccion de config existente y deteccion de terminal no-interactiva
+- [ ] 04-01-PLAN.md — Dependencias TUI, cobra setup command, terminal detection, wizard model con Step interface, welcome step, sidebar de progreso
+- [ ] 04-02-PLAN.md — DetectConfigStep con tres ramas (valido/invalido/inexistente), resumen compacto, backup automatico
 
 ### Phase 5: Validacion Telegram
 **Goal**: El operador puede ingresar su bot token y chat IDs y recibir confirmacion instantanea de que son validos antes de continuar
