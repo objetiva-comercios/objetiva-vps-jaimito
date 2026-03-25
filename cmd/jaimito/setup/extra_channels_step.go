@@ -70,9 +70,10 @@ type ExtraChannelsStep struct {
 	chatType  string
 
 	// Modo edit
-	editChannels []config.ChannelConfig
-	editCursor   int // cursor para seleccionar canal existente
-	editingIndex int // indice del canal siendo editado
+	editChannels   []config.ChannelConfig
+	editCursor     int    // cursor para seleccionar canal existente
+	editingIndex   int    // indice del canal siendo editado
+	lastEditedName string // nombre del ultimo canal editado/agregado (para mensaje de confirmacion)
 
 	done bool
 }
@@ -93,6 +94,7 @@ func (s *ExtraChannelsStep) Init(data *SetupData) tea.Cmd {
 	s.validationSeq = 0
 	s.editCursor = 0
 	s.editingIndex = -1
+	s.lastEditedName = ""
 
 	s.nameInput = textinput.New()
 	s.nameInput.Placeholder = "deploys"
@@ -157,6 +159,7 @@ func (s *ExtraChannelsStep) Update(msg tea.Msg, data *SetupData) (Step, tea.Cmd)
 		s.confirmOption = 0
 		if s.editingIndex >= 0 {
 			// Editando canal existente: actualizar chat ID in-place
+			s.lastEditedName = s.extraChannels[s.editingIndex].Name
 			s.extraChannels[s.editingIndex] = config.ChannelConfig{
 				Name:     s.extraChannels[s.editingIndex].Name,
 				ChatID:   msg.chatID,
@@ -165,6 +168,7 @@ func (s *ExtraChannelsStep) Update(msg tea.Msg, data *SetupData) (Step, tea.Cmd)
 			s.editingIndex = -1
 		} else {
 			// Canal nuevo: agregar a extraChannels
+			s.lastEditedName = s.currentName
 			s.extraChannels = append(s.extraChannels, config.ChannelConfig{
 				Name:     s.currentName,
 				ChatID:   msg.chatID,
@@ -415,18 +419,29 @@ func (s *ExtraChannelsStep) View(data *SetupData) string {
 	// Mostrar canales extra ya agregados (alineados en columnas)
 	if len(s.extraChannels) > 0 {
 		sb.WriteString("Canales configurados:\n")
+		// Calcular anchos maximos para alinear columnas
 		maxName := 0
+		maxID := 0
 		for _, ch := range s.extraChannels {
 			if len(ch.Name) > maxName {
 				maxName = len(ch.Name)
 			}
+			idStr := fmt.Sprintf("%d", ch.ChatID)
+			if len(idStr) > maxID {
+				maxID = len(idStr)
+			}
 		}
 		for i, ch := range s.extraChannels {
-			prefix := "  "
 			if s.state == stateEditSelect && i == s.editCursor {
-				prefix = StepActive.Render("> ")
+				sb.WriteString(StepActive.Render("> "))
+			} else {
+				sb.WriteString("  ")
 			}
-			sb.WriteString(fmt.Sprintf("%s%*s → chat_id: %-16d [%s]\n", prefix, maxName, ch.Name, ch.ChatID, ch.Priority))
+			// Nombre right-aligned + flecha + ID left-aligned + prioridad
+			namePad := strings.Repeat(" ", maxName-len(ch.Name))
+			idStr := fmt.Sprintf("%d", ch.ChatID)
+			idPad := strings.Repeat(" ", maxID-len(idStr))
+			sb.WriteString(namePad + ch.Name + " → " + idStr + idPad + "  [" + ch.Priority + "]\n")
 		}
 		sb.WriteString("\n")
 	}
@@ -479,9 +494,8 @@ func (s *ExtraChannelsStep) View(data *SetupData) string {
 		if s.validError != "" {
 			sb.WriteString(ErrorStyle.Render(s.validError))
 			sb.WriteString("\n\n")
-		} else if s.chatTitle != "" && len(s.extraChannels) > 0 {
-			last := s.extraChannels[len(s.extraChannels)-1]
-			sb.WriteString(StepDone.Render(fmt.Sprintf("✓ Canal '%s' → %s (%s)", last.Name, s.chatTitle, s.chatType)))
+		} else if s.chatTitle != "" && s.lastEditedName != "" {
+			sb.WriteString(StepDone.Render(fmt.Sprintf("✓ Canal '%s' → %s (%s)", s.lastEditedName, s.chatTitle, s.chatType)))
 			sb.WriteString("\n\n")
 		}
 		if len(s.editChannels) > 0 {
