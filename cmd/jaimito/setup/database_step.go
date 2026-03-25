@@ -79,9 +79,17 @@ func (s *DatabaseStep) View(data *SetupData) string {
 
 	sb.WriteString(TitleStyle.Render("Base de Datos"))
 	sb.WriteString("\n\n")
-	sb.WriteString("Ruta del archivo SQLite donde jaimito guarda los mensajes.\n\n")
-	sb.WriteString(fmt.Sprintf("Por defecto: %s\n", s.defaultValue))
-	sb.WriteString("Enter para aceptar el valor por defecto, o escribi una nueva ruta:\n")
+	currentVal := strings.TrimSpace(s.input.Value())
+	if currentVal != "" && currentVal != s.defaultValue {
+		sb.WriteString(StepDone.Render("Valor actual: "+currentVal))
+		sb.WriteString("\n")
+		sb.WriteString(HintStyle.Render("Enter para mantener, o escribi una nueva ruta:"))
+		sb.WriteString("\n")
+	} else {
+		sb.WriteString("Ruta del archivo SQLite donde jaimito guarda los mensajes.\n\n")
+		sb.WriteString(fmt.Sprintf("Por defecto: %s\n", s.defaultValue))
+		sb.WriteString("Enter para aceptar, o escribi una nueva ruta:\n")
+	}
 	sb.WriteString(s.input.View())
 	sb.WriteString("\n")
 

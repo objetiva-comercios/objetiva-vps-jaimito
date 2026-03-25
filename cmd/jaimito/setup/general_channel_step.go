@@ -238,7 +238,14 @@ func (s *GeneralChannelStep) View(data *SetupData) string {
 	// Estado normal: mostrar input
 	sb.WriteString(TitleStyle.Render("Canal General"))
 	sb.WriteString("\n\n")
-	sb.WriteString("Ingresa el chat ID del canal general:\n")
+	if data.Mode == "edit" && !s.chatChanged && s.originalChatID != 0 {
+		sb.WriteString(StepDone.Render(fmt.Sprintf("Chat ID actual: %d", s.originalChatID)))
+		sb.WriteString("\n")
+		sb.WriteString(HintStyle.Render("Enter para mantener, o ingresa un nuevo chat ID:"))
+		sb.WriteString("\n")
+	} else {
+		sb.WriteString("Ingresa el chat ID del canal general:\n")
+	}
 	sb.WriteString(s.input.View())
 	sb.WriteString("\n")
 

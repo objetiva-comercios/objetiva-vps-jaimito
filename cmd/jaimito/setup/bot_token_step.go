@@ -181,7 +181,14 @@ func (s *BotTokenStep) View(data *SetupData) string {
 	// Estado normal: mostrar input
 	sb.WriteString(TitleStyle.Render("Bot Token"))
 	sb.WriteString("\n\n")
-	sb.WriteString("Pega el token de tu bot de Telegram:\n")
+	if data.Mode == "edit" && !s.tokenChanged {
+		sb.WriteString(StepDone.Render("Token actual configurado"))
+		sb.WriteString("\n")
+		sb.WriteString(HintStyle.Render("Enter para mantener, o pega un token nuevo:"))
+		sb.WriteString("\n")
+	} else {
+		sb.WriteString("Pega el token de tu bot de Telegram:\n")
+	}
 	sb.WriteString(s.input.View())
 	sb.WriteString("\n")
 

@@ -87,9 +87,17 @@ func (s *ServerStep) View(data *SetupData) string {
 
 	sb.WriteString(TitleStyle.Render("Servidor"))
 	sb.WriteString("\n\n")
-	sb.WriteString("Direccion donde jaimito va a escuchar conexiones HTTP.\n\n")
-	sb.WriteString(fmt.Sprintf("Por defecto: %s\n", s.defaultValue))
-	sb.WriteString("Enter para aceptar el valor por defecto, o escribi una nueva direccion:\n")
+	currentVal := strings.TrimSpace(s.input.Value())
+	if currentVal != "" && currentVal != s.defaultValue {
+		sb.WriteString(StepDone.Render("Valor actual: "+currentVal))
+		sb.WriteString("\n")
+		sb.WriteString(HintStyle.Render("Enter para mantener, o escribi una nueva direccion:"))
+		sb.WriteString("\n")
+	} else {
+		sb.WriteString("Direccion donde jaimito va a escuchar conexiones HTTP.\n\n")
+		sb.WriteString(fmt.Sprintf("Por defecto: %s\n", s.defaultValue))
+		sb.WriteString("Enter para aceptar, o escribi una nueva direccion:\n")
+	}
 	sb.WriteString(s.input.View())
 	sb.WriteString("\n")
 
