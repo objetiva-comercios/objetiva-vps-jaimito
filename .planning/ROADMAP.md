@@ -66,7 +66,7 @@ Plans:
   2. El operador ve un resumen completo de toda la configuracion (bot, canales, server, db, API key) antes de que se escriba nada a disco
   3. El archivo `/etc/jaimito/config.yaml` se crea con permisos 0600 y contenido que pasa `config.Validate()` sin errores
   4. Si `config.Validate()` falla internamente, el wizard informa el problema y no escribe el archivo
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
 - [x] 06-01: Implementar `db.GenerateRawKey()`, steps de server/db config, y pantalla de resumen
@@ -80,11 +80,11 @@ Plans:
   1. Al completar el wizard, el operador recibe un mensaje de Telegram en su canal general que confirma que el setup esta funcionando
   2. Ejecutar install.sh en un VPS sin config existente invoca `jaimito setup` automaticamente via redireccion `/dev/tty`
   3. La instalacion via `curl | bash` completa el wizard interactivo sin errores de stdin aunque el script se ejecute en pipe
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 07-01: Implementar step de notificacion de test via bot API
-- [ ] 07-02: Integrar `jaimito setup` en install.sh con redireccion `/dev/tty`
+- [ ] 07-01-PLAN.md — Notificacion de test automatica post-escritura en SummaryStep con patron async (spinner + resultMsg)
+- [x] 07-02-PLAN.md — Integrar `jaimito setup` en install.sh con redireccion `/dev/tty` y manejo de reinstalacion
 
 ## Progress
 
@@ -96,4 +96,4 @@ Plans:
 | 4. Wizard Scaffold | v1.1 | 2/2 | Complete   | 2026-03-25 |
 | 5. Validacion Telegram | v1.1 | 2/2 | Complete   | 2026-03-25 |
 | 6. Configuracion y Escritura | v1.1 | 2/2 | Complete   | 2026-03-25 |
-| 7. Verificacion e Integracion | v1.1 | 0/2 | Not started | - |
+| 7. Verificacion e Integracion | v1.1 | 0/2 | Planned    |  |
