@@ -22,9 +22,9 @@ Requirements for the Setup Wizard milestone. Each maps to roadmap phases.
 ### Configuración
 
 - [x] **CONF-01**: Wizard genera API key criptográfica (`sk-` prefix) y la muestra al operador
-- [ ] **CONF-02**: Wizard genera config YAML válido y lo escribe con permisos 0600
-- [ ] **CONF-03**: Operador ve un resumen completo antes de confirmar escritura
-- [ ] **CONF-04**: Config generado pasa `config.Validate()` antes de escribirse
+- [x] **CONF-02**: Wizard genera config YAML válido y lo escribe con permisos 0600
+- [x] **CONF-03**: Operador ve un resumen completo antes de confirmar escritura
+- [x] **CONF-04**: Config generado pasa `config.Validate()` antes de escribirse
 
 ### Verificación
 
@@ -80,9 +80,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TELE-02 | Phase 5 | Complete |
 | TELE-03 | Phase 5 | Complete |
 | CONF-01 | Phase 6 | Complete |
-| CONF-02 | Phase 6 | Pending |
-| CONF-03 | Phase 6 | Pending |
-| CONF-04 | Phase 6 | Pending |
+| CONF-02 | Phase 6 | Complete |
+| CONF-03 | Phase 6 | Complete |
+| CONF-04 | Phase 6 | Complete |
 | TEST-01 | Phase 7 | Pending |
 | INST-01 | Phase 7 | Pending |
 

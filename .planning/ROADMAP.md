@@ -22,7 +22,7 @@
 
 - [x] **Phase 4: Wizard Scaffold** — El operador puede ejecutar `jaimito setup` y el wizard arranca, detecta configs existentes y aborta en terminales no-interactivas (completed 2026-03-25)
 - [x] **Phase 5: Validacion Telegram** — El operador ingresa bot token y chat IDs con validacion en vivo contra la API de Telegram en cada paso (completed 2026-03-25)
-- [ ] **Phase 6: Configuracion y Escritura** — El wizard genera una API key criptografica, valida el config completo y lo escribe a disco con permisos correctos
+- [x] **Phase 6: Configuracion y Escritura** — El wizard genera una API key criptografica, valida el config completo y lo escribe a disco con permisos correctos (completed 2026-03-25)
 - [ ] **Phase 7: Verificacion e Integracion** — El wizard envia una notificacion de test que confirma el setup, e install.sh invoca el wizard automaticamente en instalaciones nuevas
 
 ## Phase Details
@@ -69,8 +69,8 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 06-01: Implementar `db.GenerateRawKey()`, steps de server/db config, y pantalla de resumen
-- [ ] 06-02: Implementar generacion de YAML, validacion pre-escritura, y escritura con permisos 0600
+- [x] 06-01: Implementar `db.GenerateRawKey()`, steps de server/db config, y pantalla de resumen
+- [x] 06-02: Implementar generacion de YAML, validacion pre-escritura, y escritura con permisos 0600
 
 ### Phase 7: Verificacion e Integracion
 **Goal**: El operador confirma que su setup funciona de punta a punta antes de salir, e install.sh incorpora el wizard en el flujo de instalacion automatica
@@ -95,5 +95,5 @@ Plans:
 | 3. CLI and Developer Experience | v1.0 | 3/3 | Complete | 2026-02-23 |
 | 4. Wizard Scaffold | v1.1 | 2/2 | Complete   | 2026-03-25 |
 | 5. Validacion Telegram | v1.1 | 2/2 | Complete   | 2026-03-25 |
-| 6. Configuracion y Escritura | v1.1 | 0/2 | Planned    |  |
+| 6. Configuracion y Escritura | v1.1 | 2/2 | Complete   | 2026-03-25 |
 | 7. Verificacion e Integracion | v1.1 | 0/2 | Not started | - |
