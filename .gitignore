@@ -1,5 +1,5 @@
-# Binary
-jaimito
+# Binary (solo el binario en la raiz, no el directorio cmd/jaimito/)
+/jaimito
 
 # IDE
 .vscode/

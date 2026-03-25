@@ -1,0 +1,250 @@
+package setup
+
+import (
+	"fmt"
+	"os"
+	"strings"
+
+	tea "charm.land/bubbletea/v2"
+	lipgloss "charm.land/lipgloss/v2"
+	"golang.org/x/term"
+
+	"github.com/chiguire/jaimito/internal/config"
+)
+
+// SetupData contiene todos los valores recopilados por el wizard.
+// Se pasa por puntero a cada step — mutacion directa, sin message-passing.
+type SetupData struct {
+	ConfigPath  string
+	ExistingCfg *config.Config // nil si no existe
+	ConfigErr   error          // error de carga si config es invalido
+	Mode        string         // "new", "edit", "fresh"
+}
+
+// Step es la interfaz que implementa cada pantalla del wizard.
+// NO implementa tea.Model — el wizard principal es el unico tea.Model.
+type Step interface {
+	Init(data *SetupData) tea.Cmd
+	Update(msg tea.Msg, data *SetupData) (Step, tea.Cmd)
+	View(data *SetupData) string
+	Done() bool
+}
+
+// stepNames son los nombres visibles de los 7 steps en el sidebar.
+var stepNames = []string{
+	"Bienvenida",
+	"Bot Token",
+	"Canal General",
+	"Canales Extra",
+	"Servidor",
+	"Base de Datos",
+	"Resumen",
+}
+
+// WizardModel es el unico tea.Model del wizard.
+type WizardModel struct {
+	steps        []Step
+	currentStep  int
+	data         *SetupData
+	quitting     bool
+	confirmExit  bool
+	completedMap map[int]bool
+}
+
+// NewWizardModel construye un WizardModel listo para usar.
+func NewWizardModel(cfgPath string, existingCfg *config.Config, configErr error) WizardModel {
+	data := &SetupData{
+		ConfigPath:  cfgPath,
+		ExistingCfg: existingCfg,
+		ConfigErr:   configErr,
+	}
+
+	steps := []Step{
+		&WelcomeStep{},
+		&PlaceholderStep{name: "Bot Token"},
+		&PlaceholderStep{name: "Canal General"},
+		&PlaceholderStep{name: "Canales Extra"},
+		&PlaceholderStep{name: "Servidor"},
+		&PlaceholderStep{name: "Base de Datos"},
+		&PlaceholderStep{name: "Resumen"},
+	}
+
+	return WizardModel{
+		steps:        steps,
+		currentStep:  0,
+		data:         data,
+		completedMap: make(map[int]bool),
+	}
+}
+
+// Init implementa tea.Model. Llama Init del primer step.
+func (m WizardModel) Init() tea.Cmd {
+	if len(m.steps) > 0 {
+		return m.steps[0].Init(m.data)
+	}
+	return nil
+}
+
+// Update implementa tea.Model.
+func (m WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// CRITICO: usar tea.KeyPressMsg (v2), NO tea.KeyMsg (v1) — ver Pitfall W3
+	switch msg := msg.(type) {
+	case tea.KeyPressMsg:
+		switch msg.String() {
+		case "ctrl+c":
+			if m.confirmExit {
+				m.quitting = true
+				return m, tea.Quit
+			}
+			m.confirmExit = true
+			return m, nil
+		case "esc", "up":
+			// Reset confirmExit si estaba activo
+			if m.confirmExit {
+				m.confirmExit = false
+				return m, nil
+			}
+			if m.currentStep > 0 {
+				m.currentStep--
+			}
+			return m, nil
+		default:
+			// Cualquier otra tecla cancela confirmExit
+			if m.confirmExit {
+				m.confirmExit = false
+			}
+		}
+	}
+
+	// Delegar al step activo
+	newStep, cmd := m.steps[m.currentStep].Update(msg, m.data)
+	m.steps[m.currentStep] = newStep
+
+	if newStep.Done() && m.currentStep < len(m.steps)-1 {
+		m.completedMap[m.currentStep] = true
+		m.currentStep++
+		initCmd := m.steps[m.currentStep].Init(m.data)
+		return m, tea.Batch(cmd, initCmd)
+	}
+
+	return m, cmd
+}
+
+// View implementa tea.Model.
+func (m WizardModel) View() tea.View {
+	var content string
+
+	if m.quitting {
+		content = "Saliendo...\n"
+	} else if m.confirmExit {
+		content = ErrorStyle.Render("Seguro que queres salir? Se pierden los datos ingresados. (Ctrl+C para confirmar, cualquier otra tecla para cancelar)\n")
+	} else {
+		content = renderLayout(m)
+	}
+
+	return tea.NewView(content)
+}
+
+// renderSidebar genera la barra lateral con los steps y su estado.
+func renderSidebar(currentStep int, completedSteps map[int]bool) string {
+	var sb strings.Builder
+
+	for i, name := range stepNames {
+		var line string
+		if i == currentStep {
+			// El step activo siempre se muestra como activo, incluso si fue completado antes
+			line = StepActive.Render("▸ " + name)
+		} else if completedSteps[i] {
+			line = StepDone.Render("✓ " + name)
+		} else {
+			line = StepPending.Render("  " + name)
+		}
+		sb.WriteString(line)
+		sb.WriteString("\n")
+	}
+
+	// Contador [N/7]
+	counter := fmt.Sprintf("[%d/7]", currentStep+1)
+	sb.WriteString(HintStyle.Render(counter))
+	sb.WriteString("\n")
+
+	return sb.String()
+}
+
+// renderLayout compone el layout completo: sidebar + separador + contenido del step.
+func renderLayout(m WizardModel) string {
+	sidebar := renderSidebar(m.currentStep, m.completedMap)
+
+	// Contenido del step actual
+	stepContent := m.steps[m.currentStep].View(m.data)
+
+	// Separador vertical
+	separator := lipgloss.NewStyle().Foreground(ColorGray).Render("│")
+
+	// Unir sidebar + separador + contenido
+	sidebarLines := strings.Split(sidebar, "\n")
+	contentLines := strings.Split(stepContent, "\n")
+
+	// Rellenar el sidebar hasta la altura del contenido si es necesario
+	maxLines := len(sidebarLines)
+	if len(contentLines) > maxLines {
+		maxLines = len(contentLines)
+	}
+	for len(sidebarLines) < maxLines {
+		sidebarLines = append(sidebarLines, "")
+	}
+	for len(contentLines) < maxLines {
+		contentLines = append(contentLines, "")
+	}
+
+	var layout strings.Builder
+	for i := 0; i < maxLines; i++ {
+		// Padding del sidebar a ancho fijo
+		sbLine := fmt.Sprintf("%-20s", sidebarLines[i])
+		layout.WriteString(sbLine)
+		layout.WriteString(" ")
+		layout.WriteString(separator)
+		layout.WriteString("  ")
+		if i < len(contentLines) {
+			layout.WriteString(contentLines[i])
+		}
+		layout.WriteString("\n")
+	}
+
+	// Barra de atajos inferior
+	hints := HintStyle.Render("Enter: continuar  │  Esc: volver  │  Ctrl+C: salir")
+	layout.WriteString("\n")
+	layout.WriteString(hints)
+	layout.WriteString("\n")
+
+	return layout.String()
+}
+
+// FormatNonInteractiveError retorna el mensaje de error formateado cuando
+// jaimito setup se ejecuta en una terminal no-interactiva.
+func FormatNonInteractiveError() string {
+	msg := "Error: jaimito setup requiere una terminal interactiva.\n\n" +
+		"Si estas usando curl | bash, el instalador ya redirige stdin automaticamente.\n" +
+		"Para ejecutar manualmente: jaimito setup --config /etc/jaimito/config.yaml"
+	return ErrorStyle.Render(msg)
+}
+
+// RunWizard lanza el wizard bubbletea con los parametros dados.
+func RunWizard(cfgPath string, existingCfg *config.Config, configErr error) error {
+	model := NewWizardModel(cfgPath, existingCfg, configErr)
+
+	var opts []tea.ProgramOption
+
+	// Pitfall W2: si stdout no es TTY, abrir /dev/tty para output
+	if !term.IsTerminal(int(os.Stdout.Fd())) {
+		tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0)
+		if err == nil {
+			defer tty.Close()
+			opts = append(opts, tea.WithOutput(tty))
+		}
+	}
+
+	p := tea.NewProgram(model, opts...)
+	_, err := p.Run()
+	return err
+}
