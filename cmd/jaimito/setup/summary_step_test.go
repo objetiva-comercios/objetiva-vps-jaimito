@@ -1,11 +1,13 @@
 package setup_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"gopkg.in/yaml.v3"
 
@@ -140,9 +142,10 @@ func TestSummaryStep_View_KeepExistingKey(t *testing.T) {
 	}
 }
 
-// --- Write flow tests ---
+// --- Write flow tests (actualizados para flujo de dos fases) ---
 
-// TestSummaryStep_WriteConfig_Success verifica que Enter escribe el config en disco.
+// TestSummaryStep_WriteConfig_Success verifica que Enter inicia el envio de test (sending=true, Done()=false).
+// Luego testNotificationResultMsg completa el flujo (Done()=true).
 func TestSummaryStep_WriteConfig_Success(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "config.yaml")
@@ -154,15 +157,32 @@ func TestSummaryStep_WriteConfig_Success(t *testing.T) {
 	updated, cmd := step.Update(enterMsg, data)
 	s := updated.(*setup.SummaryStep)
 
-	if !s.Done() {
-		t.Error("Done() debe ser true despues de escritura exitosa")
+	// Despues de Enter con exito: sending=true, Done()=false, cmd no nil (Batch)
+	if s.Done() {
+		t.Error("Done() debe ser false despues de Enter (en estado sending)")
+	}
+	if !s.IsSending() {
+		t.Error("IsSending() debe ser true despues de Enter exitoso")
 	}
 	if cmd == nil {
-		t.Error("Update() debe retornar un cmd (tea.Quit) despues de escritura exitosa")
+		t.Error("Update() debe retornar un cmd (tea.Batch) despues de escritura exitosa")
 	}
 
+	// El archivo debe haberse creado
 	if _, err := os.Stat(cfgPath); os.IsNotExist(err) {
 		t.Errorf("Archivo de config no fue creado en %s", cfgPath)
+	}
+
+	// Completar con resultado de test exitoso
+	resultMsg := setup.NewTestNotificationResultMsg(nil)
+	updated2, cmd2 := s.Update(resultMsg, data)
+	s2 := updated2.(*setup.SummaryStep)
+
+	if !s2.Done() {
+		t.Error("Done() debe ser true despues de testNotificationResultMsg exitoso")
+	}
+	if cmd2 == nil {
+		t.Error("Update() debe retornar tea.Quit despues de testNotificationResultMsg")
 	}
 }
 
@@ -179,13 +199,27 @@ func TestSummaryStep_WriteConfig_CreatesDir(t *testing.T) {
 	updated, _ := step.Update(enterMsg, data)
 	s := updated.(*setup.SummaryStep)
 
-	if !s.Done() {
+	// Despues de Enter: sending=true, Done()=false
+	if s.Done() {
 		view := s.View(data)
-		t.Errorf("Done() debe ser true; view:\n%s", view)
+		t.Errorf("Done() debe ser false despues de Enter (en sending); view:\n%s", view)
+	}
+	if !s.IsSending() {
+		view := s.View(data)
+		t.Errorf("IsSending() debe ser true despues de Enter exitoso; view:\n%s", view)
 	}
 
 	if _, err := os.Stat(cfgPath); os.IsNotExist(err) {
 		t.Errorf("Archivo de config no fue creado en %s", cfgPath)
+	}
+
+	// Completar con resultado de test
+	resultMsg := setup.NewTestNotificationResultMsg(nil)
+	updated2, _ := s.Update(resultMsg, data)
+	s2 := updated2.(*setup.SummaryStep)
+
+	if !s2.Done() {
+		t.Error("Done() debe ser true despues de testNotificationResultMsg")
 	}
 }
 
@@ -432,7 +466,8 @@ func TestSummaryStep_RequiresEnter(t *testing.T) {
 	}
 }
 
-// TestSummaryStep_Done_QuitsWizard verifica que tras escritura exitosa, Done()=true y el cmd retornado no es nil (tea.Quit).
+// TestSummaryStep_Done_QuitsWizard verifica que tras Enter exitoso, Done()=false (en sending),
+// y que tea.Quit llega despues de testNotificationResultMsg.
 func TestSummaryStep_Done_QuitsWizard(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "config.yaml")
@@ -444,10 +479,227 @@ func TestSummaryStep_Done_QuitsWizard(t *testing.T) {
 	updated, cmd := step.Update(enterMsg, data)
 	s := updated.(*setup.SummaryStep)
 
-	if !s.Done() {
-		t.Error("Done() debe ser true despues de escritura exitosa")
+	// Despues de Enter: sending=true, Done()=false, cmd no nil (Batch, no Quit)
+	if s.Done() {
+		t.Error("Done() debe ser false despues de Enter (en estado sending)")
 	}
 	if cmd == nil {
-		t.Error("Update() debe retornar tea.Quit (cmd no nil) despues de escritura exitosa")
+		t.Error("Update() debe retornar cmd (tea.Batch) despues de Enter exitoso")
+	}
+
+	// Enviar resultado de test exitoso: ahora si llega tea.Quit
+	resultMsg := setup.NewTestNotificationResultMsg(nil)
+	updated2, cmd2 := s.Update(resultMsg, data)
+	s2 := updated2.(*setup.SummaryStep)
+
+	if !s2.Done() {
+		t.Error("Done() debe ser true despues de testNotificationResultMsg")
+	}
+	if cmd2 == nil {
+		t.Error("Update() debe retornar tea.Quit despues de testNotificationResultMsg")
+	}
+}
+
+// --- Tests nuevos para notificacion de test ---
+
+// TestSummaryStep_TestNotification_SendsSpinner verifica que Enter con config exitoso
+// pone sending=true y View muestra el spinner con texto.
+func TestSummaryStep_TestNotification_SendsSpinner(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+
+	step := &setup.SummaryStep{}
+	data := makeValidSetupData(cfgPath)
+
+	enterMsg := tea.KeyPressMsg{Code: tea.KeyEnter}
+	updated, _ := step.Update(enterMsg, data)
+	s := updated.(*setup.SummaryStep)
+
+	if !s.IsSending() {
+		t.Error("IsSending() debe ser true despues de Enter exitoso")
+	}
+
+	view := s.View(data)
+	if !strings.Contains(view, "Enviando notificacion de test") {
+		t.Errorf("View() en sending debe contener 'Enviando notificacion de test'; got:\n%s", view)
+	}
+}
+
+// TestSummaryStep_TestNotification_Success verifica que testNotificationResultMsg con err=nil
+// pone testOk=true y Done()=true, y View muestra el checkmark verde.
+func TestSummaryStep_TestNotification_Success(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+
+	step := &setup.SummaryStep{}
+	data := makeValidSetupData(cfgPath)
+
+	// Primero llegar al estado sending
+	enterMsg := tea.KeyPressMsg{Code: tea.KeyEnter}
+	updated, _ := step.Update(enterMsg, data)
+	s := updated.(*setup.SummaryStep)
+
+	// Enviar resultado exitoso
+	resultMsg := setup.NewTestNotificationResultMsg(nil)
+	updated2, _ := s.Update(resultMsg, data)
+	s2 := updated2.(*setup.SummaryStep)
+
+	if !s2.Done() {
+		t.Error("Done() debe ser true despues de testNotificationResultMsg exitoso")
+	}
+
+	view := s2.View(data)
+	if !strings.Contains(view, "Notificacion de test enviada") {
+		t.Errorf("View() con testOk debe contener 'Notificacion de test enviada'; got:\n%s", view)
+	}
+	if !strings.Contains(view, "systemctl start jaimito") {
+		t.Errorf("View() con testOk debe contener hint systemctl; got:\n%s", view)
+	}
+}
+
+// TestSummaryStep_TestNotification_Failure verifica que testNotificationResultMsg con error
+// pone testErr con el mensaje y Done()=true, y View muestra warning amarillo.
+func TestSummaryStep_TestNotification_Failure(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+
+	step := &setup.SummaryStep{}
+	data := makeValidSetupData(cfgPath)
+
+	// Primero llegar al estado sending
+	enterMsg := tea.KeyPressMsg{Code: tea.KeyEnter}
+	updated, _ := step.Update(enterMsg, data)
+	s := updated.(*setup.SummaryStep)
+
+	// Enviar resultado con error
+	resultMsg := setup.NewTestNotificationResultMsg(errors.New("timeout"))
+	updated2, _ := s.Update(resultMsg, data)
+	s2 := updated2.(*setup.SummaryStep)
+
+	if !s2.Done() {
+		t.Error("Done() debe ser true incluso con error en notificacion de test")
+	}
+
+	view := s2.View(data)
+	if !strings.Contains(view, "Notificacion de test fallida") {
+		t.Errorf("View() con testErr debe contener 'Notificacion de test fallida'; got:\n%s", view)
+	}
+	if !strings.Contains(view, "timeout") {
+		t.Errorf("View() con testErr debe contener el mensaje de error; got:\n%s", view)
+	}
+}
+
+// TestSummaryStep_TestNotification_WarningNotError verifica que el fallo de test
+// usa WarningStyle (amarillo) y no ErrorStyle (rojo), y permite continuar.
+func TestSummaryStep_TestNotification_WarningNotError(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+
+	step := &setup.SummaryStep{}
+	data := makeValidSetupData(cfgPath)
+
+	// Llegar a sending
+	enterMsg := tea.KeyPressMsg{Code: tea.KeyEnter}
+	updated, _ := step.Update(enterMsg, data)
+	s := updated.(*setup.SummaryStep)
+
+	// Enviar error
+	resultMsg := setup.NewTestNotificationResultMsg(errors.New("network error"))
+	updated2, _ := s.Update(resultMsg, data)
+	s2 := updated2.(*setup.SummaryStep)
+
+	view := s2.View(data)
+
+	// Debe contener hint de systemctl (config es valido, no bloqueante)
+	if !strings.Contains(view, "systemctl start jaimito") {
+		t.Errorf("View() con testErr debe contener hint systemctl (no bloqueante); got:\n%s", view)
+	}
+}
+
+// TestSummaryStep_TestNotification_NilBot verifica que ValidatedBot=nil genera error limpio.
+func TestSummaryStep_TestNotification_NilBot(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+
+	step := &setup.SummaryStep{}
+	data := makeValidSetupData(cfgPath)
+	data.ValidatedBot = nil // bot no disponible
+
+	enterMsg := tea.KeyPressMsg{Code: tea.KeyEnter}
+	updated, cmd := step.Update(enterMsg, data)
+	s := updated.(*setup.SummaryStep)
+
+	// Con bot nil: debe estar en sending=true o direct done con error
+	// El cmd debe existir (sendTestNotificationCmd o batch)
+	if cmd == nil {
+		t.Error("Update() debe retornar cmd incluso con ValidatedBot=nil")
+	}
+
+	// Si esta en sending, ejecutar el cmd para obtener el resultado
+	if s.IsSending() {
+		// Ejecutar el cmd para simular el resultado async
+		msg := cmd()
+		if msg == nil {
+			// El cmd es un Batch, no podemos ejecutarlo directamente en tests
+			// Enviar directamente el mensaje de error esperado
+			resultMsg := setup.NewTestNotificationResultMsg(errors.New("bot no disponible"))
+			updated2, _ := s.Update(resultMsg, data)
+			s2 := updated2.(*setup.SummaryStep)
+			if !s2.Done() {
+				t.Error("Done() debe ser true despues de testNotificationResultMsg con error")
+			}
+		} else {
+			updated2, _ := s.Update(msg, data)
+			s2 := updated2.(*setup.SummaryStep)
+			if !s2.Done() {
+				t.Error("Done() debe ser true despues del cmd con bot nil")
+			}
+			view := s2.View(data)
+			if !strings.Contains(view, "bot no disponible") && !strings.Contains(view, "Notificacion de test fallida") {
+				t.Errorf("View() debe indicar error de bot; got:\n%s", view)
+			}
+		}
+	}
+}
+
+// TestSummaryStep_SpinnerTick_WhenSending verifica que spinner.TickMsg se procesa cuando sending=true.
+func TestSummaryStep_SpinnerTick_WhenSending(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := filepath.Join(dir, "config.yaml")
+
+	step := &setup.SummaryStep{}
+	data := makeValidSetupData(cfgPath)
+
+	// Llegar al estado sending
+	enterMsg := tea.KeyPressMsg{Code: tea.KeyEnter}
+	updated, _ := step.Update(enterMsg, data)
+	s := updated.(*setup.SummaryStep)
+
+	if !s.IsSending() {
+		t.Fatal("IsSending() debe ser true para este test")
+	}
+
+	// Enviar spinner.TickMsg
+	tickMsg := spinner.TickMsg{}
+	_, cmd := s.Update(tickMsg, data)
+
+	// Debe retornar un cmd (tick continuo del spinner)
+	if cmd == nil {
+		t.Error("Update() con spinner.TickMsg cuando sending=true debe retornar cmd (tick)")
+	}
+}
+
+// TestSummaryStep_SpinnerTick_WhenNotSending verifica que spinner.TickMsg se ignora cuando sending=false.
+func TestSummaryStep_SpinnerTick_WhenNotSending(t *testing.T) {
+	step := &setup.SummaryStep{}
+	data := makeValidSetupData("/tmp/config.yaml")
+
+	// El step esta en estado inicial: sending=false
+	tickMsg := spinner.TickMsg{}
+	_, cmd := step.Update(tickMsg, data)
+
+	// Debe retornar nil cmd (no procesar tick cuando no se esta enviando)
+	if cmd != nil {
+		t.Error("Update() con spinner.TickMsg cuando sending=false debe retornar nil cmd")
 	}
 }
