@@ -26,11 +26,11 @@ Every event that happens on the VPS gets reliably captured and delivered to Tele
 
 ### Active
 
-- [ ] Interactive CLI setup wizard (`jaimito setup`) with bubbletea TUI
-- [ ] Live validation of Telegram bot token and chat IDs against API
-- [ ] Auto-generation of API key and config YAML writing
-- [ ] Test notification to prove setup works before finishing
-- [ ] install.sh integration (replaces manual config.example.yaml copy)
+- ✓ Interactive CLI setup wizard (`jaimito setup`) with bubbletea TUI — Validated in Phase 4-7: Setup Wizard
+- ✓ Live validation of Telegram bot token and chat IDs against API — Validated in Phase 5: Validacion Telegram
+- ✓ Auto-generation of API key and config YAML writing — Validated in Phase 6: Configuracion y Escritura
+- ✓ Test notification to prove setup works before finishing — Validated in Phase 7: Verificacion e Integracion
+- ✓ install.sh integration (replaces manual config.example.yaml copy) — Validated in Phase 7: Verificacion e Integracion
 
 ## Current Milestone: v1.1 Setup Wizard
 
@@ -94,4 +94,4 @@ Every event that happens on the VPS gets reliably captured and delivered to Tele
 | API/dispatcher separation | API enqueues to DB, dispatcher reads independently | ✓ Good — clean boundary, testable |
 
 ---
-*Last updated: 2026-03-23 after v1.1 milestone start*
+*Last updated: 2026-03-25 after Phase 7 (Verificacion e Integracion) complete — v1.1 Setup Wizard milestone complete. Wizard envia notificacion de test a Telegram, install.sh invoca wizard automaticamente.*
