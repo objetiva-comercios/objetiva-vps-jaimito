@@ -218,9 +218,9 @@ echo "  sudo journalctl -u ${SERVICE_NAME} -f     # Logs en vivo"
 echo "  sudo systemctl restart ${SERVICE_NAME}     # Reiniciar"
 echo ""
 # Extraer API key del config para mostrar el export listo
-API_KEY=$(grep -A1 'seed_api_keys' "${CONFIG_FILE}" 2>/dev/null | grep 'key:' | head -1 | sed 's/.*key: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/' | xargs)
+API_KEY=$(grep -A2 'seed_api_keys' "${CONFIG_FILE}" 2>/dev/null | grep 'key:' | head -1 | sed 's/.*key: *//' | tr -d '"' | tr -d "'" | xargs 2>/dev/null || echo "")
 if [ -n "$API_KEY" ] && [ "$API_KEY" != "sk-REPLACE_ME_WITH_A_REAL_KEY" ]; then
-    echo -e "${CYAN}API Key (copiar y guardar):${NC}"
+    echo -e "${CYAN}API Key:${NC}"
     echo -e "  ${YELLOW}export JAIMITO_API_KEY=${API_KEY}${NC}"
     echo ""
     # Agregar al .bashrc si no esta

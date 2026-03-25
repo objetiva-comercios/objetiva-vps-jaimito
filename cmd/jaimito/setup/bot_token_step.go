@@ -130,9 +130,13 @@ func (s *BotTokenStep) Update(msg tea.Msg, data *SetupData) (Step, tea.Cmd) {
 			// Modo edit sin cambio de token: usar el token original sin re-validar (D-04, Pitfall 5)
 			if data.Mode == "edit" && !s.tokenChanged && data.ExistingCfg != nil {
 				data.BotToken = data.ExistingCfg.Telegram.Token
-				// Copiar datos existentes si los hay (pueden no estar disponibles en edit sin re-validar)
-				data.BotUsername = data.BotUsername
-				data.BotDisplayName = data.BotDisplayName
+				// Crear instancia de bot para que SummaryStep pueda enviar test notification
+				if data.ValidatedBot == nil {
+					b, err := bot.New(data.ExistingCfg.Telegram.Token)
+					if err == nil {
+						data.ValidatedBot = b
+					}
+				}
 				s.done = true
 				return s, nil
 			}
