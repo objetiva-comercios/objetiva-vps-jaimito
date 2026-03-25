@@ -95,5 +95,5 @@ Plans:
 | 3. CLI and Developer Experience | v1.0 | 3/3 | Complete | 2026-02-23 |
 | 4. Wizard Scaffold | v1.1 | 2/2 | Complete   | 2026-03-25 |
 | 5. Validacion Telegram | v1.1 | 2/2 | Complete   | 2026-03-25 |
-| 6. Configuracion y Escritura | v1.1 | 0/2 | Not started | - |
+| 6. Configuracion y Escritura | v1.1 | 0/2 | Planned    |  |
 | 7. Verificacion e Integracion | v1.1 | 0/2 | Not started | - |
