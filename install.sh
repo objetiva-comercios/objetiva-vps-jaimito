@@ -139,19 +139,31 @@ sudo mkdir -p "${DATA_DIR}"
 ok "Directorio de datos listo"
 
 # -- Config ------------------------------------------------------------------
+CONFIG_NEEDS_EDIT=false
 if [ ! -f "$CONFIG_FILE" ]; then
-    info "Copiando config de ejemplo a ${CONFIG_FILE}..."
+    info "Iniciando wizard de configuracion interactivo..."
     sudo mkdir -p "${CONFIG_DIR}"
-    sudo cp configs/config.example.yaml "${CONFIG_FILE}"
-    warn "Config de ejemplo copiada. EDITAR ANTES DE INICIAR:"
-    warn "  sudo nano ${CONFIG_FILE}"
-    warn "  - Configurar telegram.token con tu bot token"
-    warn "  - Configurar channels con los chat_id reales"
-    warn "  - Configurar seed_api_keys con una key real"
-    CONFIG_NEEDS_EDIT=true
+    if sudo "${BINARY_DEST}" setup < /dev/tty; then
+        ok "Configuracion completada via wizard"
+    else
+        warn "El wizard no completo la configuracion."
+        warn "Instala el servicio pero no lo iniciamos."
+        warn "Cuando estes listo: sudo jaimito setup"
+        CONFIG_NEEDS_EDIT=true
+    fi
 else
-    ok "Config existente preservada en ${CONFIG_FILE}"
-    CONFIG_NEEDS_EDIT=false
+    ok "Config existente encontrada en ${CONFIG_FILE}"
+    printf "${YELLOW}[WARN]${NC}  Reconfigurar con el wizard? (s/n): "
+    read -r RECONFIG < /dev/tty
+    if [ "$RECONFIG" = "s" ] || [ "$RECONFIG" = "S" ]; then
+        if sudo "${BINARY_DEST}" setup < /dev/tty; then
+            ok "Reconfiguracion completada"
+        else
+            warn "Wizard cancelado. Configuracion anterior preservada."
+        fi
+    else
+        ok "Configuracion existente preservada"
+    fi
 fi
 
 # -- Instalar servicio systemd -----------------------------------------------
@@ -163,8 +175,8 @@ ok "Servicio ${SERVICE_NAME} instalado y habilitado"
 
 # -- Iniciar servicio --------------------------------------------------------
 if [ "$CONFIG_NEEDS_EDIT" = true ]; then
-    warn "Servicio NO iniciado — editar la config primero:"
-    warn "  sudo nano ${CONFIG_FILE}"
+    warn "Servicio NO iniciado — completar la configuracion primero:"
+    warn "  sudo jaimito setup"
     warn "  sudo systemctl start ${SERVICE_NAME}"
 else
     info "Iniciando servicio..."
