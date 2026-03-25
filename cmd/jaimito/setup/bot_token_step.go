@@ -63,9 +63,16 @@ type BotTokenStep struct {
 	done          bool
 }
 
-// Init implementa Step. Configura el textinput y el spinner.
+// Init implementa Step. Resetea estado completo para ser idempotente ante re-entry.
 // En modo "edit" con config existente, pre-llena el input con el token ofuscado.
 func (s *BotTokenStep) Init(data *SetupData) tea.Cmd {
+	s.done = false
+	s.validating = false
+	s.validError = ""
+	s.validationSeq = 0
+	s.resolvedToken = ""
+	s.tokenChanged = false
+
 	s.input = textinput.New()
 	s.input.Placeholder = "123456789:ABCdefGhIjKlMnOpQrStUvWxYz"
 	s.input.CharLimit = 256

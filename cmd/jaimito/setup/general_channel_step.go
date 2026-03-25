@@ -92,9 +92,28 @@ type GeneralChannelStep struct {
 	done           bool
 }
 
-// Init implementa Step. Configura el textinput y el spinner.
+// Init implementa Step. Resetea estado completo para ser idempotente ante re-entry.
 // En modo "edit" con config existente, pre-llena con el chat ID del canal general.
 func (s *GeneralChannelStep) Init(data *SetupData) tea.Cmd {
+	// Reset completo: Init puede ser llamado multiples veces por navegacion Esc/Enter
+	s.done = false
+	s.validating = false
+	s.validError = ""
+	s.validationSeq = 0
+	s.chatTitle = ""
+	s.chatType = ""
+	s.chatChanged = false
+	s.originalChatID = 0
+
+	// Limpiar "general" previo de data.Channels si existe (re-entry)
+	filtered := data.Channels[:0]
+	for _, ch := range data.Channels {
+		if ch.Name != "general" {
+			filtered = append(filtered, ch)
+		}
+	}
+	data.Channels = filtered
+
 	s.input = textinput.New()
 	s.input.Placeholder = "-1001234567890"
 	s.input.CharLimit = 20

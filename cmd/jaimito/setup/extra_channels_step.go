@@ -71,8 +71,21 @@ type ExtraChannelsStep struct {
 	done bool
 }
 
-// Init implementa Step.
+// Init implementa Step. Resetea estado completo para ser idempotente ante re-entry.
 func (s *ExtraChannelsStep) Init(data *SetupData) tea.Cmd {
+	// Reset completo: Init puede ser llamado multiples veces por navegacion Esc/Enter
+	s.extraChannels = nil
+	s.editChannels = nil
+	s.done = false
+	s.validError = ""
+	s.confirmOption = 0
+	s.chatTitle = ""
+	s.chatType = ""
+	s.currentName = ""
+	s.currentChatID = 0
+	s.currentPriority = 1 // default "normal" per D-11
+	s.validationSeq = 0
+
 	s.nameInput = textinput.New()
 	s.nameInput.Placeholder = "deploys"
 	s.nameInput.CharLimit = 30
@@ -84,7 +97,6 @@ func (s *ExtraChannelsStep) Init(data *SetupData) tea.Cmd {
 	s.spinner = spinner.New(spinner.WithSpinner(spinner.Dot))
 
 	s.priorities = []string{"low", "normal", "high"}
-	s.currentPriority = 1 // default "normal" per D-11
 
 	// Modo edit: pre-cargar canales extra (todos menos "general")
 	if data.Mode == "edit" && data.ExistingCfg != nil {
