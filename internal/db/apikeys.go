@@ -87,18 +87,27 @@ func UpdateLastUsed(ctx context.Context, db *sql.DB, keyID string) error {
 	return nil
 }
 
-// CreateKey generates a new API key with the given name, stores its hash in the database,
-// and returns the raw key. The raw key is shown exactly once — only the hash is persisted.
-func CreateKey(ctx context.Context, database *sql.DB, name string) (string, error) {
+// GenerateRawKey genera una API key criptograficamente segura con prefijo "sk-".
+// Funcion pura sin efectos secundarios — segura para usar desde el wizard.
+func GenerateRawKey() (string, error) {
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {
 		return "", fmt.Errorf("generate key: %w", err)
 	}
-	key := "sk-" + hex.EncodeToString(raw)
+	return "sk-" + hex.EncodeToString(raw), nil
+}
+
+// CreateKey generates a new API key with the given name, stores its hash in the database,
+// and returns the raw key. The raw key is shown exactly once — only the hash is persisted.
+func CreateKey(ctx context.Context, database *sql.DB, name string) (string, error) {
+	key, err := GenerateRawKey()
+	if err != nil {
+		return "", err
+	}
 	hash := HashToken(key)
 	id := uuid.New().String()
 
-	_, err := database.ExecContext(ctx,
+	_, err = database.ExecContext(ctx,
 		`INSERT INTO api_keys (id, key_hash, name) VALUES (?, ?, ?)`,
 		id, hash, name,
 	)
