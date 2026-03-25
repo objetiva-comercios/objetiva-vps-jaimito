@@ -21,7 +21,7 @@ Hub de notificaciones push para VPS. Centraliza todas las alertas generadas en u
 
 - **Go 1.24** o superior
 - Un **bot de Telegram** (token obtenido de [@BotFather](https://t.me/BotFather))
-- El **chat ID** de Telegram donde el bot enviará mensajes
+- El **chat ID** de Telegram donde el bot enviará mensajes (obtener reenviando un mensaje del grupo a [@RawDataBot](https://t.me/RawDataBot))
 - **Linux con systemd** (para despliegue en producción)
 
 ## Instalación

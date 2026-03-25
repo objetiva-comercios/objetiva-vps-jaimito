@@ -94,11 +94,18 @@ openssl rand -hex 32 | sed 's/^/sk-/'
 
 ### Obtener el chat_id de Telegram
 
-1. Crear un bot con [@BotFather](https://t.me/BotFather) y copiar el token
-2. Agregar el bot al grupo/canal destino
-3. Enviar un mensaje al grupo
-4. Visitar `https://api.telegram.org/bot<TOKEN>/getUpdates`
-5. Buscar el campo `chat.id` en la respuesta
+**Metodo rapido (recomendado):**
+1. Enviar un mensaje en el grupo de Telegram
+2. Reenviar ese mensaje a [@RawDataBot](https://t.me/RawDataBot)
+3. El bot responde con el JSON del mensaje — buscar `"chat": {"id": -100XXXXXXXXX}`
+
+**Nota:** el chat ID de grupos es negativo (empieza con `-100`). Un ID positivo como `42795671` es un chat privado, no un grupo.
+
+**Metodo alternativo:**
+1. Agregar el bot al grupo
+2. Enviar un mensaje al grupo
+3. Visitar `https://api.telegram.org/bot<TOKEN>/getUpdates`
+4. Buscar el campo `chat.id` en la respuesta
 
 ## Servicios
 
@@ -166,8 +173,19 @@ sudo journalctl -u jaimito --no-pager -n 50
 
 **Causas comunes:**
 - Config no editada (token de Telegram invalido) → ejecutar `sudo jaimito setup`
-- `chat_id` incorrecto (el bot no tiene acceso al chat) → el wizard valida esto automaticamente
-- Puerto 8080 ya en uso → cambiar `server.listen` en config o reconfigurar con `sudo jaimito setup`
+- `chat_id` incorrecto o generico (100000001) → reconfigurar con `sudo jaimito setup` usando IDs reales obtenidos via @RawDataBot
+- El bot no tiene acceso al chat → agregar el bot al grupo primero
+- Puerto 8080 ya en uso → cambiar `server.listen` en config
+
+### "connection refused" al usar `jaimito send`
+
+El servicio no esta corriendo. Verificar:
+```bash
+sudo systemctl status jaimito
+sudo journalctl -u jaimito --no-pager -n 20
+```
+
+Si los logs muestran `chat_id unreachable`, los chat IDs en la config no son validos. Reconfigurar con `sudo jaimito setup`.
 
 ### Notificaciones no llegan a Telegram
 
