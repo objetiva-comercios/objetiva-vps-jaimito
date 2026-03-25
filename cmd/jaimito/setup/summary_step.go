@@ -10,6 +10,7 @@ import (
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
+	lipgloss "charm.land/lipgloss/v2"
 	"github.com/go-telegram/bot"
 	"gopkg.in/yaml.v3"
 
@@ -167,9 +168,11 @@ func (s *SummaryStep) View(data *SetupData) string {
 			maxName = len(ch.Name)
 		}
 	}
-	fmtStr := fmt.Sprintf("  %%%ds → %%-16d [%%s]\n", maxName)
+	nameStyle := lipgloss.NewStyle().Width(maxName).Align(lipgloss.Right)
 	for _, ch := range data.Channels {
-		sb.WriteString(fmt.Sprintf(fmtStr, ch.Name, ch.ChatID, ch.Priority))
+		name := nameStyle.Render(ch.Name)
+		idStr := fmt.Sprintf("%-16d", ch.ChatID)
+		sb.WriteString("  " + name + " → " + idStr + " [" + ch.Priority + "]\n")
 	}
 	sb.WriteString("\n")
 

@@ -8,6 +8,7 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
+	lipgloss "charm.land/lipgloss/v2"
 
 	"github.com/chiguire/jaimito/internal/config"
 )
@@ -417,7 +418,9 @@ func (s *ExtraChannelsStep) View(data *SetupData) string {
 	sb.WriteString("\n\n")
 
 	// Mostrar TODOS los canales (general + extras) alineados en columnas
-	allChannels := append(data.Channels, s.extraChannels...)
+	allChannels := make([]config.ChannelConfig, 0, len(data.Channels)+len(s.extraChannels))
+	allChannels = append(allChannels, data.Channels...)
+	allChannels = append(allChannels, s.extraChannels...)
 	if len(allChannels) > 0 {
 		sb.WriteString("Canales configurados:\n")
 		// Calcular ancho maximo del nombre
@@ -427,16 +430,20 @@ func (s *ExtraChannelsStep) View(data *SetupData) string {
 				maxName = len(ch.Name)
 			}
 		}
-		fmtStr := fmt.Sprintf("  %%%ds → %%-16d [%%s]\n", maxName)
-		editFmtStr := fmt.Sprintf("> %%%ds → %%-16d [%%s]\n", maxName)
+		// Usar lipgloss para alinear nombres (ANSI-safe, terminal-compatible)
+		nameStyle := lipgloss.NewStyle().Width(maxName).Align(lipgloss.Right)
 		for i, ch := range allChannels {
 			isExtra := i >= len(data.Channels)
 			extraIdx := i - len(data.Channels)
+			name := nameStyle.Render(ch.Name)
+			idStr := fmt.Sprintf("%-16d", ch.ChatID)
+			line := name + " → " + idStr + " [" + ch.Priority + "]"
 			if s.state == stateEditSelect && isExtra && extraIdx == s.editCursor {
-				sb.WriteString(StepActive.Render(fmt.Sprintf(editFmtStr, ch.Name, ch.ChatID, ch.Priority)))
+				sb.WriteString(StepActive.Render("> " + line))
 			} else {
-				sb.WriteString(fmt.Sprintf(fmtStr, ch.Name, ch.ChatID, ch.Priority))
+				sb.WriteString("  " + line)
 			}
+			sb.WriteString("\n")
 		}
 		sb.WriteString("\n")
 	}
