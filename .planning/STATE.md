@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Setup Wizard
-status: Ready to execute
-stopped_at: Completed 04-01-PLAN.md
-last_updated: "2026-03-25T00:35:35.510Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 04-02-PLAN.md
+last_updated: "2026-03-25T00:42:43.075Z"
 progress:
   total_phases: 4
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
+  completed_plans: 2
 ---
 
 # Project State
@@ -45,6 +45,7 @@ Plan: 2 of 2
 - Sin datos v1.1 todavia
 
 | Phase 04-wizard-scaffold P01 | 8 | 1 tasks | 8 files |
+| Phase 04-wizard-scaffold P02 | 4 | 1 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -60,6 +61,8 @@ Decisiones relevantes para v1.1:
 - [Phase 04-01]: Step interface simple (no tea.Model anidados) para evitar complejidad de message-passing entre steps del wizard
 - [Phase 04-01]: renderSidebar prioriza step activo sobre completedMap para navegacion correcta hacia atras con Esc
 - [Phase 04-01]: .gitignore: patron /jaimito (con slash) en vez de jaimito para no ignorar el directorio cmd/jaimito/
+- [Phase 04-02]: sidebarOffset en WizardModel para steps internos (DetectConfigStep) sin afectar sidebar de 7 steps visibles
+- [Phase 04-02]: ConfigExists bool en SetupData separa deteccion del archivo de la validacion del contenido
 
 ### Pending Todos
 
@@ -71,6 +74,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-25T00:35:35.506Z
-Stopped at: Completed 04-01-PLAN.md
+Last session: 2026-03-25T00:42:43.070Z
+Stopped at: Completed 04-02-PLAN.md
 Resume file: None

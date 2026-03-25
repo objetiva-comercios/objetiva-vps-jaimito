@@ -20,7 +20,7 @@
 
 **Milestone Goal:** Eliminar la barrera del config.yaml manual con un wizard interactivo que guia al operador paso a paso, valida todo en vivo contra la API de Telegram, y envia una notificacion de test antes de terminar.
 
-- [ ] **Phase 4: Wizard Scaffold** — El operador puede ejecutar `jaimito setup` y el wizard arranca, detecta configs existentes y aborta en terminales no-interactivas
+- [x] **Phase 4: Wizard Scaffold** — El operador puede ejecutar `jaimito setup` y el wizard arranca, detecta configs existentes y aborta en terminales no-interactivas (completed 2026-03-25)
 - [ ] **Phase 5: Validacion Telegram** — El operador ingresa bot token y chat IDs con validacion en vivo contra la API de Telegram en cada paso
 - [ ] **Phase 6: Configuracion y Escritura** — El wizard genera una API key criptografica, valida el config completo y lo escribe a disco con permisos correctos
 - [ ] **Phase 7: Verificacion e Integracion** — El wizard envia una notificacion de test que confirma el setup, e install.sh invoca el wizard automaticamente en instalaciones nuevas
@@ -40,7 +40,7 @@
 
 Plans:
 - [x] 04-01-PLAN.md — Dependencias TUI, cobra setup command, terminal detection, wizard model con Step interface, welcome step, sidebar de progreso
-- [ ] 04-02-PLAN.md — DetectConfigStep con tres ramas (valido/invalido/inexistente), resumen compacto, backup automatico
+- [x] 04-02-PLAN.md — DetectConfigStep con tres ramas (valido/invalido/inexistente), resumen compacto, backup automatico
 
 ### Phase 5: Validacion Telegram
 **Goal**: El operador puede ingresar su bot token y chat IDs y recibir confirmacion instantanea de que son validos antes de continuar
@@ -93,7 +93,7 @@ Plans:
 | 1. Foundation | v1.0 | 3/3 | Complete | 2026-02-21 |
 | 2. Core Pipeline | v1.0 | 4/4 | Complete | 2026-02-21 |
 | 3. CLI and Developer Experience | v1.0 | 3/3 | Complete | 2026-02-23 |
-| 4. Wizard Scaffold | v1.1 | 1/2 | In Progress|  |
+| 4. Wizard Scaffold | v1.1 | 2/2 | Complete   | 2026-03-25 |
 | 5. Validacion Telegram | v1.1 | 0/2 | Not started | - |
 | 6. Configuracion y Escritura | v1.1 | 0/2 | Not started | - |
 | 7. Verificacion e Integracion | v1.1 | 0/2 | Not started | - |
