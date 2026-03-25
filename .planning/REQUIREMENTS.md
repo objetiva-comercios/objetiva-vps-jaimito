@@ -28,7 +28,7 @@ Requirements for the Setup Wizard milestone. Each maps to roadmap phases.
 
 ### Verificación
 
-- [ ] **TEST-01**: Wizard envía notificación de test al canal general para probar el setup completo
+- [x] **TEST-01**: Wizard envía notificación de test al canal general para probar el setup completo
 
 ### Integración
 
@@ -83,7 +83,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONF-02 | Phase 6 | Complete |
 | CONF-03 | Phase 6 | Complete |
 | CONF-04 | Phase 6 | Complete |
-| TEST-01 | Phase 7 | Pending |
+| TEST-01 | Phase 7 | Complete |
 | INST-01 | Phase 7 | Pending |
 
 **Coverage:**
