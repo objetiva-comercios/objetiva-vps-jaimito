@@ -9,6 +9,30 @@ import (
 	"github.com/go-telegram/bot"
 )
 
+// BotInfo contiene la informacion del bot obtenida de la API de Telegram via getMe.
+type BotInfo struct {
+	Username    string // sin '@' — viene de models.User.Username
+	DisplayName string // viene de models.User.FirstName
+}
+
+// ValidateTokenWithInfo valida el token contra la API de Telegram llamando getMe.
+// Retorna el *bot.Bot reutilizable, BotInfo con username y display name, y error si falla.
+// CRITICO: bot.New() solo parsea el formato — DEBE llamarse b.GetMe(ctx) para validar contra la API real.
+func ValidateTokenWithInfo(ctx context.Context, token string) (*bot.Bot, BotInfo, error) {
+	b, err := bot.New(token)
+	if err != nil {
+		return nil, BotInfo{}, fmt.Errorf("formato de token invalido: %w", err)
+	}
+	me, err := b.GetMe(ctx)
+	if err != nil {
+		return nil, BotInfo{}, fmt.Errorf("token rechazado por Telegram: %w", err)
+	}
+	return b, BotInfo{
+		Username:    me.Username,
+		DisplayName: me.FirstName,
+	}, nil
+}
+
 // ValidateToken creates a Telegram bot instance and validates the token by
 // calling getMe. Returns the *bot.Bot instance for reuse in chat validation
 // and later phases (dispatcher).
