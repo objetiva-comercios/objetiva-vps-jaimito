@@ -82,8 +82,8 @@ func NewWizardModelWithExists(cfgPath string, existingCfg *config.Config, config
 	visibleSteps := []Step{
 		&WelcomeStep{},
 		&BotTokenStep{},
-		&PlaceholderStep{name: "Canal General"},
-		&PlaceholderStep{name: "Canales Extra"},
+		&GeneralChannelStep{},
+		&ExtraChannelsStep{},
 		&PlaceholderStep{name: "Servidor"},
 		&PlaceholderStep{name: "Base de Datos"},
 		&PlaceholderStep{name: "Resumen"},
