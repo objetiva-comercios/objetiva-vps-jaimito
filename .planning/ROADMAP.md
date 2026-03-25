@@ -51,11 +51,11 @@ Plans:
   2. El operador ingresa un chat ID para el canal general y el wizard confirma que el bot tiene acceso a ese chat via `bot.GetChat()`
   3. El operador puede agregar canales extra (deploys, errors, cron, etc.) con validacion de cada chat ID en el momento de ingreso
   4. Un token invalido o chat ID inaccesible no avanza al siguiente paso — el operador debe corregirlo o cancelar
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 05-01: Implementar `telegram.ValidateTokenWithInfo()` y step de bot token con validacion en vivo
-- [ ] 05-02: Implementar steps de canal general y canales extra con validacion de chat IDs
+- [ ] 05-01-PLAN.md — ValidateTokenWithInfo() en telegram/client.go + BotTokenStep con validacion async, spinner, sequence number y modo edit
+- [ ] 05-02-PLAN.md — GeneralChannelStep y ExtraChannelsStep con validacion async de chat IDs, loop de canales extra con maquina de estados
 
 ### Phase 6: Configuracion y Escritura
 **Goal**: El wizard genera y escribe un archivo de configuracion valido que jaimito puede usar inmediatamente al arrancar
