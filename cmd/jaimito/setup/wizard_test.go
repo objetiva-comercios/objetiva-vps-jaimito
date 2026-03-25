@@ -55,7 +55,7 @@ func TestWelcomeStep_Done(t *testing.T) {
 }
 
 // TestWizardModel_Sidebar verifica que el View() del WizardModel contiene
-// el indicador de step activo '▸', el contador '[1/7]', y los 7 nombres de steps.
+// el indicador de step activo '▸', el contador '[1/8]', y los 8 nombres de steps.
 func TestWizardModel_Sidebar(t *testing.T) {
 	model := setup.NewWizardModel("/etc/jaimito/config.yaml", nil, nil)
 	view := model.View()
@@ -64,8 +64,8 @@ func TestWizardModel_Sidebar(t *testing.T) {
 	if !strings.Contains(viewStr, "▸") {
 		t.Error("Sidebar debe contener '▸' para el step activo")
 	}
-	if !strings.Contains(viewStr, "[1/7]") {
-		t.Error("Sidebar debe contener '[1/7]' como contador")
+	if !strings.Contains(viewStr, "[1/8]") {
+		t.Error("Sidebar debe contener '[1/8]' como contador")
 	}
 
 	expectedSteps := []string{
@@ -75,6 +75,7 @@ func TestWizardModel_Sidebar(t *testing.T) {
 		"Canales Extra",
 		"Servidor",
 		"Base de Datos",
+		"API Key",
 		"Resumen",
 	}
 	for _, name := range expectedSteps {

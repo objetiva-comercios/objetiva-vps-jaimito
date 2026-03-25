@@ -21,7 +21,8 @@ var (
 
 // Estilos generales del wizard.
 var (
-	TitleStyle = lipgloss.NewStyle().Foreground(ColorCyan).Bold(true)
-	ErrorStyle = lipgloss.NewStyle().Foreground(ColorRed).Bold(true)
-	HintStyle  = lipgloss.NewStyle().Foreground(ColorGray)
+	TitleStyle   = lipgloss.NewStyle().Foreground(ColorCyan).Bold(true)
+	ErrorStyle   = lipgloss.NewStyle().Foreground(ColorRed).Bold(true)
+	HintStyle    = lipgloss.NewStyle().Foreground(ColorGray)
+	WarningStyle = lipgloss.NewStyle().Foreground(ColorYellow).Bold(true)
 )

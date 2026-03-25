@@ -28,6 +28,12 @@ type SetupData struct {
 	BotDisplayName string              // FirstName del bot
 	ValidatedBot   *bot.Bot            // instancia reutilizable para GetChat en steps siguientes
 	Channels       []config.ChannelConfig // canales acumulados (general + extras)
+
+	// Nuevos campos Phase 6:
+	ServerListen    string // populado por ServerStep
+	DatabasePath    string // populado por DatabaseStep
+	GeneratedAPIKey string // populado por APIKeyStep (raw key con prefijo sk-)
+	KeepExistingKey bool   // en modo edit: mantener key actual
 }
 
 // Step es la interfaz que implementa cada pantalla del wizard.
@@ -39,7 +45,7 @@ type Step interface {
 	Done() bool
 }
 
-// stepNames son los nombres visibles de los 7 steps en el sidebar.
+// stepNames son los nombres visibles de los 8 steps en el sidebar.
 var stepNames = []string{
 	"Bienvenida",
 	"Bot Token",
@@ -47,6 +53,7 @@ var stepNames = []string{
 	"Canales Extra",
 	"Servidor",
 	"Base de Datos",
+	"API Key",
 	"Resumen",
 }
 
@@ -78,15 +85,16 @@ func NewWizardModelWithExists(cfgPath string, existingCfg *config.Config, config
 		ConfigExists: configExists,
 	}
 
-	// Steps visibles en la sidebar (los 7 del wizard)
+	// Steps visibles en la sidebar (los 8 del wizard)
 	visibleSteps := []Step{
 		&WelcomeStep{},
 		&BotTokenStep{},
 		&GeneralChannelStep{},
 		&ExtraChannelsStep{},
-		&PlaceholderStep{name: "Servidor"},
-		&PlaceholderStep{name: "Base de Datos"},
-		&PlaceholderStep{name: "Resumen"},
+		&ServerStep{},
+		&DatabaseStep{},
+		&APIKeyStep{},
+		&PlaceholderStep{name: "Resumen"}, // TEMPORAL — plan 06-02 lo reemplaza con SummaryStep
 	}
 
 	// Si hay config (valido o invalido), insertar DetectConfigStep como step 0 (interno).
@@ -203,8 +211,8 @@ func renderSidebar(sidebarStep int, completedSteps map[int]bool, sidebarOffset i
 		sb.WriteString("\n")
 	}
 
-	// Contador [N/7]
-	counter := fmt.Sprintf("[%d/7]", sidebarStep+1)
+	// Contador dinamico [N/8]
+	counter := fmt.Sprintf("[%d/%d]", sidebarStep+1, len(stepNames))
 	sb.WriteString(HintStyle.Render(counter))
 	sb.WriteString("\n")
 
