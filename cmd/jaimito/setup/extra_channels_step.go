@@ -16,22 +16,26 @@ import (
 type extraChannelState int
 
 const (
-	stateAskAdd        extraChannelState = iota // "Agregar canal extra? (Si/No)"
-	stateInputName                              // tipear nombre del canal
-	stateInputChatID                            // tipear chat ID
-	stateSelectPriority                         // elegir low/normal/high
-	stateValidating                             // spinner mientras valida
-	stateConfirmMore                            // "Agregar otro? (Si/No)"
+	stateAskAdd         extraChannelState = iota // "Agregar canal extra? (Si/No)"
+	stateInputName                               // tipear nombre del canal
+	stateInputChatID                             // tipear chat ID
+	stateSelectPriority                          // elegir low/normal/high
+	stateValidating                              // spinner mientras valida
+	stateConfirmMore                             // "Agregar otro? (Si/No)"
+	stateEditSelect                              // seleccionar canal existente para editar
+	stateEditChatID                              // editar chat ID de canal existente
 )
 
 // Constantes exportadas para tests (mapean a los estados internos).
 const (
-	StateAskAdd        = stateAskAdd
-	StateInputName     = stateInputName
-	StateInputChatID   = stateInputChatID
+	StateAskAdd         = stateAskAdd
+	StateInputName      = stateInputName
+	StateInputChatID    = stateInputChatID
 	StateSelectPriority = stateSelectPriority
-	StateValidating    = stateValidating
-	StateConfirmMore   = stateConfirmMore
+	StateValidating     = stateValidating
+	StateConfirmMore    = stateConfirmMore
+	StateEditSelect     = stateEditSelect
+	StateEditChatID     = stateEditChatID
 )
 
 // nameRegex valida nombres de canales: solo letras minusculas, numeros y guiones.
@@ -67,6 +71,8 @@ type ExtraChannelsStep struct {
 
 	// Modo edit
 	editChannels []config.ChannelConfig
+	editCursor   int // cursor para seleccionar canal existente
+	editingIndex int // indice del canal siendo editado
 
 	done bool
 }
@@ -85,6 +91,8 @@ func (s *ExtraChannelsStep) Init(data *SetupData) tea.Cmd {
 	s.currentChatID = 0
 	s.currentPriority = 1 // default "normal" per D-11
 	s.validationSeq = 0
+	s.editCursor = 0
+	s.editingIndex = -1
 
 	s.nameInput = textinput.New()
 	s.nameInput.Placeholder = "deploys"
@@ -133,22 +141,36 @@ func (s *ExtraChannelsStep) Update(msg tea.Msg, data *SetupData) (Step, tea.Cmd)
 		if msg.seq != s.validationSeq {
 			return s, nil
 		}
-		s.state = stateConfirmMore // reset en cualquier caso
 		if msg.err != nil {
 			s.validError = msg.err.Error()
-			s.state = stateInputChatID
+			if s.editingIndex >= 0 {
+				s.state = stateEditChatID
+			} else {
+				s.state = stateInputChatID
+			}
 			return s, s.chatIDInput.Focus()
 		}
-		// Exito: crear canal y agregar a extraChannels
+		// Exito
 		s.chatTitle = msg.chatTitle
 		s.chatType = msg.chatType
-		s.extraChannels = append(s.extraChannels, config.ChannelConfig{
-			Name:     s.currentName,
-			ChatID:   msg.chatID,
-			Priority: s.priorities[s.currentPriority],
-		})
 		s.validError = ""
-		s.confirmOption = 0 // reset a "Si" para la confirmacion
+		s.confirmOption = 0
+		if s.editingIndex >= 0 {
+			// Editando canal existente: actualizar chat ID in-place
+			s.extraChannels[s.editingIndex] = config.ChannelConfig{
+				Name:     s.extraChannels[s.editingIndex].Name,
+				ChatID:   msg.chatID,
+				Priority: s.extraChannels[s.editingIndex].Priority,
+			}
+			s.editingIndex = -1
+		} else {
+			// Canal nuevo: agregar a extraChannels
+			s.extraChannels = append(s.extraChannels, config.ChannelConfig{
+				Name:     s.currentName,
+				ChatID:   msg.chatID,
+				Priority: s.priorities[s.currentPriority],
+			})
+		}
 		s.state = stateConfirmMore
 		return s, nil
 
@@ -177,36 +199,125 @@ func (s *ExtraChannelsStep) handleKey(msg tea.KeyPressMsg, data *SetupData) (Ste
 	case stateValidating:
 		// Ignorar input durante validacion
 		return s, nil
+
+	case stateEditSelect:
+		return s.handleEditSelectKey(msg, data)
+
+	case stateEditChatID:
+		return s.handleEditChatIDKey(msg, data)
 	}
 
 	return s, nil
 }
 
-// handleConfirmKey maneja los estados stateAskAdd y stateConfirmMore (Si/No).
+// confirmOptionsCount retorna la cantidad de opciones del menu confirm segun estado y modo.
+func (s *ExtraChannelsStep) confirmOptionsCount() int {
+	// En stateConfirmMore con canales existentes: Editar / Agregar / Continuar = 3
+	if s.state == stateConfirmMore && len(s.editChannels) > 0 {
+		return 3
+	}
+	// Default: Si / No = 2
+	return 2
+}
+
+// handleConfirmKey maneja los estados stateAskAdd y stateConfirmMore.
 func (s *ExtraChannelsStep) handleConfirmKey(msg tea.KeyPressMsg, data *SetupData) (Step, tea.Cmd) {
+	maxOpt := s.confirmOptionsCount() - 1
 	switch msg.String() {
 	case "up", "k":
 		if s.confirmOption > 0 {
 			s.confirmOption--
 		}
 	case "down", "j":
-		if s.confirmOption < 1 {
+		if s.confirmOption < maxOpt {
 			s.confirmOption++
 		}
 	case "enter":
-		if s.confirmOption == 0 {
-			// Si: transicionar a ingresar nombre
-			s.validError = ""
-			s.nameInput.SetValue("")
-			s.state = stateInputName
-			return s, s.nameInput.Focus()
+		if s.state == stateConfirmMore && len(s.editChannels) > 0 {
+			// Modo edit con canales pre-cargados: Editar(0) / Agregar(1) / Continuar(2)
+			switch s.confirmOption {
+			case 0: // Editar canal existente
+				s.editCursor = 0
+				s.state = stateEditSelect
+				return s, nil
+			case 1: // Agregar nuevo
+				s.validError = ""
+				s.nameInput.SetValue("")
+				s.state = stateInputName
+				return s, s.nameInput.Focus()
+			case 2: // Continuar
+				data.Channels = append(data.Channels, s.extraChannels...)
+				s.done = true
+				return s, nil
+			}
+		} else {
+			// Menu simple: Si(0) / No(1)
+			if s.confirmOption == 0 {
+				s.validError = ""
+				s.nameInput.SetValue("")
+				s.state = stateInputName
+				return s, s.nameInput.Focus()
+			}
+			data.Channels = append(data.Channels, s.extraChannels...)
+			s.done = true
+			return s, nil
 		}
-		// No: commitear canales extra a data.Channels y marcar done
-		data.Channels = append(data.Channels, s.extraChannels...)
-		s.done = true
+	}
+	return s, nil
+}
+
+// handleEditSelectKey permite seleccionar un canal existente para editar su chat ID.
+func (s *ExtraChannelsStep) handleEditSelectKey(msg tea.KeyPressMsg, data *SetupData) (Step, tea.Cmd) {
+	switch msg.String() {
+	case "up", "k":
+		if s.editCursor > 0 {
+			s.editCursor--
+		}
+	case "down", "j":
+		if s.editCursor < len(s.extraChannels)-1 {
+			s.editCursor++
+		}
+	case "enter":
+		s.editingIndex = s.editCursor
+		s.chatIDInput.SetValue(fmt.Sprintf("%d", s.extraChannels[s.editingIndex].ChatID))
+		s.validError = ""
+		s.state = stateEditChatID
+		return s, s.chatIDInput.Focus()
+	case "esc":
+		s.confirmOption = 0
+		s.state = stateConfirmMore
 		return s, nil
 	}
 	return s, nil
+}
+
+// handleEditChatIDKey maneja la edicion del chat ID de un canal existente.
+func (s *ExtraChannelsStep) handleEditChatIDKey(msg tea.KeyPressMsg, data *SetupData) (Step, tea.Cmd) {
+	switch msg.String() {
+	case "enter":
+		chatID, err := parseChatID(s.chatIDInput.Value())
+		if err != nil {
+			s.validError = err.Error()
+			return s, nil
+		}
+		// Validar contra Telegram
+		s.validationSeq++
+		s.state = stateValidating
+		s.validError = ""
+		s.currentChatID = chatID
+		return s, tea.Batch(
+			validateChatCmd(data.ValidatedBot, chatID, s.validationSeq),
+			s.spinner.Tick,
+		)
+	case "esc":
+		s.editingIndex = -1
+		s.state = stateEditSelect
+		return s, nil
+	default:
+		var cmd tea.Cmd
+		s.chatIDInput, cmd = s.chatIDInput.Update(msg)
+		return s, cmd
+	}
 }
 
 // handleNameKey maneja el estado stateInputName.
@@ -301,11 +412,21 @@ func (s *ExtraChannelsStep) View(data *SetupData) string {
 	sb.WriteString(TitleStyle.Render("Canales Extra"))
 	sb.WriteString("\n\n")
 
-	// Mostrar canales extra ya agregados
+	// Mostrar canales extra ya agregados (alineados en columnas)
 	if len(s.extraChannels) > 0 {
 		sb.WriteString("Canales configurados:\n")
+		maxName := 0
 		for _, ch := range s.extraChannels {
-			sb.WriteString(fmt.Sprintf("  %s → chat_id: %d [%s]\n", ch.Name, ch.ChatID, ch.Priority))
+			if len(ch.Name) > maxName {
+				maxName = len(ch.Name)
+			}
+		}
+		for i, ch := range s.extraChannels {
+			prefix := "  "
+			if s.state == stateEditSelect && i == s.editCursor {
+				prefix = StepActive.Render("> ")
+			}
+			sb.WriteString(fmt.Sprintf("%s%*s → chat_id: %-16d [%s]\n", prefix, maxName, ch.Name, ch.ChatID, ch.Priority))
 		}
 		sb.WriteString("\n")
 	}
@@ -358,18 +479,43 @@ func (s *ExtraChannelsStep) View(data *SetupData) string {
 		if s.validError != "" {
 			sb.WriteString(ErrorStyle.Render(s.validError))
 			sb.WriteString("\n\n")
-		} else if len(s.extraChannels) > 0 {
+		} else if s.chatTitle != "" && len(s.extraChannels) > 0 {
 			last := s.extraChannels[len(s.extraChannels)-1]
-			if s.chatTitle != "" {
-				sb.WriteString(StepDone.Render(fmt.Sprintf("✓ Canal '%s' → %s (%s)", last.Name, s.chatTitle, s.chatType)))
-			} else {
-				sb.WriteString(StepDone.Render(fmt.Sprintf("✓ Canal '%s' configurado", last.Name)))
-			}
+			sb.WriteString(StepDone.Render(fmt.Sprintf("✓ Canal '%s' → %s (%s)", last.Name, s.chatTitle, s.chatType)))
 			sb.WriteString("\n\n")
 		}
-		sb.WriteString("Agregar otro canal?\n\n")
-		sb.WriteString(renderConfirmSelector(s.confirmOption))
+		if len(s.editChannels) > 0 {
+			// Modo edit: menu con 3 opciones
+			sb.WriteString("Que queres hacer?\n\n")
+			options := []string{"Editar chat ID de un canal", "Agregar canal nuevo", "Continuar"}
+			for i, opt := range options {
+				if i == s.confirmOption {
+					sb.WriteString(StepActive.Render("> " + opt))
+				} else {
+					sb.WriteString(StepPending.Render("  " + opt))
+				}
+				sb.WriteString("\n")
+			}
+		} else {
+			sb.WriteString("Agregar otro canal?\n\n")
+			sb.WriteString(renderConfirmSelector(s.confirmOption))
+		}
 		sb.WriteString("\n")
+
+	case stateEditSelect:
+		sb.WriteString("Selecciona el canal a editar:\n\n")
+		sb.WriteString(HintStyle.Render("↑/↓: mover │ Enter: editar │ Esc: volver"))
+		sb.WriteString("\n")
+
+	case stateEditChatID:
+		ch := s.extraChannels[s.editingIndex]
+		sb.WriteString(fmt.Sprintf("Nuevo chat ID para '%s' (actual: %d):\n", ch.Name, ch.ChatID))
+		sb.WriteString(s.chatIDInput.View())
+		sb.WriteString("\n")
+		if s.validError != "" {
+			sb.WriteString(ErrorStyle.Render(s.validError))
+			sb.WriteString("\n")
+		}
 	}
 
 	return sb.String()
