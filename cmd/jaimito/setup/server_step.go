@@ -106,10 +106,6 @@ func (s *ServerStep) View(data *SetupData) string {
 		sb.WriteString("\n")
 	}
 
-	sb.WriteString("\n")
-	sb.WriteString(HintStyle.Render("Enter: confirmar  \u2502  Esc: volver  \u2502  Ctrl+C: salir"))
-	sb.WriteString("\n")
-
 	return sb.String()
 }
 

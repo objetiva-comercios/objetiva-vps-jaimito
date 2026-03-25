@@ -122,8 +122,6 @@ func (s *APIKeyStep) View(data *SetupData) string {
 		sb.WriteString("\n")
 		sb.WriteString(HintStyle.Render("Generar una nueva key NO revoca la anterior."))
 		sb.WriteString("\n\n")
-		sb.WriteString(HintStyle.Render("\u2191/\u2193: mover  \u2502  Enter: seleccionar  \u2502  Esc: volver"))
-		sb.WriteString("\n")
 		return sb.String()
 	}
 
@@ -139,7 +137,7 @@ func (s *APIKeyStep) View(data *SetupData) string {
 		sb.WriteString(ErrorStyle.Render(s.confirmError))
 	}
 	sb.WriteString("\n\n")
-	sb.WriteString(HintStyle.Render("s + Enter: confirmar copia  \u2502  Esc: volver  \u2502  Ctrl+C: salir"))
+	sb.WriteString(HintStyle.Render("Escribi 's' para confirmar que copiaste la key"))
 	sb.WriteString("\n")
 
 	return sb.String()

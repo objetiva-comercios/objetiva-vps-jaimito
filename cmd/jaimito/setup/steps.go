@@ -173,6 +173,7 @@ func (s *DetectConfigStep) View(data *SetupData) string {
 
 	sb.WriteString("\n")
 	sb.WriteString(HintStyle.Render("↑/↓: mover │ Enter: seleccionar"))
+	sb.WriteString("\n")
 
 	return sb.String()
 }

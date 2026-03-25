@@ -220,8 +220,7 @@ func (s *SummaryStep) View(data *SetupData) string {
 		}
 		sb.WriteString("\n")
 	} else {
-		sb.WriteString(HintStyle.Render("Presiona Enter para escribir el archivo de configuracion.") + "\n\n")
-		sb.WriteString(HintStyle.Render("Enter: escribir config  │  Esc: volver  │  Ctrl+C: salir") + "\n")
+		sb.WriteString(HintStyle.Render("Presiona Enter para escribir el archivo de configuracion.") + "\n")
 	}
 
 	return sb.String()
