@@ -115,24 +115,36 @@ Prioridad de resolución: flag `--key`/`--server` > variable de entorno > config
 
 ## Uso
 
+### Comandos
+
 | Comando | Descripción |
 |---------|-------------|
 | `jaimito` | Inicia el servidor daemon |
-| `jaimito setup` | Wizard interactivo de configuración (valida Telegram, genera API key, escribe config) |
-| `jaimito --config /ruta/config.yaml` | Inicia con config personalizado |
-| `jaimito send "mensaje"` | Envía notificación al canal `general` |
-| `jaimito send -c cron -p high "mensaje"` | Envía con canal y prioridad específicos |
-| `jaimito send -t "Título" "cuerpo"` | Envía con título (negrita en Telegram) |
-| `jaimito send --tags backup,cron "mensaje"` | Envía con tags (hashtags en Telegram) |
-| `jaimito send --stdin` | Lee el cuerpo del mensaje desde stdin |
-| `jaimito wrap -- /path/to/script.sh` | Ejecuta un comando y notifica si falla |
-| `jaimito wrap -c cron -- comando args` | Wrap con canal específico |
-| `jaimito keys create --name mi-servicio` | Crea una nueva API key (prefijo `sk-`) |
-| `jaimito keys list` | Lista las claves activas |
-| `jaimito keys revoke <id>` | Revoca una clave por su UUID |
-| `go build ./cmd/jaimito` | Compila el binario |
-| `go test ./...` | Ejecuta todos los tests |
-| `go vet ./...` | Análisis estático |
+| `jaimito setup` | Wizard interactivo de configuración |
+| `jaimito send` | Envía una notificación a Telegram |
+| `jaimito wrap` | Ejecuta un comando y notifica si falla |
+| `jaimito keys` | Gestionar API keys (create/list/revoke) |
+
+### Flags de `send`
+
+| Flag | Corto | Descripción | Default |
+|------|-------|-------------|---------|
+| `--channel` | `-c` | Canal destino | `general` |
+| `--priority` | `-p` | Prioridad: `low`, `normal`, `high` | `normal` |
+| `--title` | `-t` | Título del mensaje (negrita en Telegram) | — |
+| `--tags` | | Tags separados por coma (se muestran como `#tag`) | — |
+| `--stdin` | | Leer cuerpo desde stdin | `false` |
+| `--key` | | API key | `$JAIMITO_API_KEY` |
+| `--server` | | Dirección del servidor | config / `$JAIMITO_SERVER` |
+
+### Flags de `wrap`
+
+| Flag | Corto | Descripción | Default |
+|------|-------|-------------|---------|
+| `--channel` | `-c` | Canal destino | `general` |
+| `--priority` | `-p` | Prioridad: `low`, `normal`, `high` | `normal` |
+| `--key` | | API key | `$JAIMITO_API_KEY` |
+| `--server` | | Dirección del servidor | config / `$JAIMITO_SERVER` |
 
 ### Iniciar el servidor
 

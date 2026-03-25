@@ -23,12 +23,31 @@ var (
 
 var sendCmd = &cobra.Command{
 	Use:   "send [body]",
-	Short: "Send a notification",
-	Long:  "Send a notification to Telegram via the jaimito server HTTP API.",
-	Example: `  jaimito send "Backup completed successfully"
-  jaimito send -c cron -p high "Backup failed"
-  jaimito send -t "Deploy" "v1.2.3 deployed to production"
-  echo "disk usage: 90%" | jaimito send --stdin -c monitoring`,
+	Short: "Enviar una notificacion",
+	Long: `Envia una notificacion a Telegram via la API HTTP de jaimito.
+
+Flags:
+  -c, --channel    Canal destino (default: general)
+  -p, --priority   Prioridad: low, normal, high (default: normal)
+  -t, --title      Titulo del mensaje (aparece en negrita)
+      --tags       Tags separados por coma (se muestran como #tag)
+      --stdin      Leer el cuerpo del mensaje desde stdin
+      --key        API key (default: variable JAIMITO_API_KEY)
+      --server     Direccion del servidor (default: config o JAIMITO_SERVER)`,
+	Example: `  # Mensaje simple
+  jaimito send "Backup completado"
+
+  # Con canal (-c) y prioridad (-p)
+  jaimito send -c cron -p high "Backup fallo"
+
+  # Con titulo (-t) — aparece en negrita en Telegram
+  jaimito send -t "Deploy" "v1.2.3 desplegado en produccion"
+
+  # Con tags — se muestran como #backup #cron
+  jaimito send --tags backup,cron "Backup completado"
+
+  # Desde stdin (util para pipes)
+  df -h / | jaimito send --stdin -t "Disk Report" -c monitoring`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runSend,
 }

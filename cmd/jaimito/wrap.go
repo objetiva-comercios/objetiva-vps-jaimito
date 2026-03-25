@@ -23,13 +23,24 @@ var (
 
 var wrapCmd = &cobra.Command{
 	Use:   "wrap -- command [args...]",
-	Short: "Run a command and notify on failure",
-	Long: `Run a command and send a notification if it exits with a non-zero status.
-The notification includes the command name, exit code, and captured output.
-On success (exit code 0), wrap exits silently.`,
-	Example: `  jaimito wrap -- /path/to/backup.sh
-  jaimito wrap -c cron -- pg_dump -F c mydb -f /backups/mydb.dump
-  jaimito wrap -c cron -p high -- /usr/local/bin/certbot renew`,
+	Short: "Ejecutar un comando y notificar si falla",
+	Long: `Ejecuta un comando y envia una notificacion si sale con codigo distinto de 0.
+La notificacion incluye el nombre del comando, codigo de salida y output capturado.
+Si el comando sale bien (exit 0), wrap termina silenciosamente.
+
+Flags:
+  -c, --channel    Canal destino (default: general)
+  -p, --priority   Prioridad: low, normal, high (default: normal)
+      --key        API key (default: variable JAIMITO_API_KEY)
+      --server     Direccion del servidor (default: config o JAIMITO_SERVER)`,
+	Example: `  # Monitorear un script de backup
+  jaimito wrap -- /path/to/backup.sh
+
+  # Con canal y prioridad
+  jaimito wrap -c cron -p high -- certbot renew
+
+  # En crontab
+  0 2 * * * JAIMITO_API_KEY=sk-xxx jaimito wrap -c cron -- /usr/local/bin/backup.sh`,
 	Args:  cobra.MinimumNArgs(1),
 	RunE:  runWrap,
 }
