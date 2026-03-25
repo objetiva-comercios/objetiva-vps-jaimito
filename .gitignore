@@ -12,8 +12,15 @@
 .env
 .env.*
 
+# Claude Code
+.claude/
+
 # Planning (GSD)
 .planning/
+
+# Temp
+.clone/
+setup.test
 
 # Logs
 *.log

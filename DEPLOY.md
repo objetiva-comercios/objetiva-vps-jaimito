@@ -35,9 +35,27 @@ curl -sL https://raw.githubusercontent.com/objetiva-comercios/objetiva-vps-jaimi
 - **Base de datos**: `/var/lib/jaimito/jaimito.db` (SQLite WAL-mode)
 - **Servicio**: `jaimito.service` (systemd)
 
-## Configuracion
+## Configuracion inicial
 
-### Archivo de config
+### Setup wizard (recomendado)
+
+```bash
+sudo jaimito setup
+```
+
+El wizard interactivo guía la configuración paso a paso:
+
+1. Pide el **bot token** de Telegram y lo valida contra la API (`getMe`)
+2. Pide el **chat ID** del canal general y lo valida (`getChat`)
+3. Permite agregar **canales extra** (deploys, errors, cron, etc.) con validación
+4. Configura la **dirección HTTP** (default: `127.0.0.1:8080`)
+5. Configura la **ruta de base de datos** (default: `/var/lib/jaimito/jaimito.db`)
+6. Genera una **API key** automáticamente (prefijo `sk-`)
+7. Muestra un **resumen** y ofrece enviar notificación de test
+
+Escribe `/etc/jaimito/config.yaml` con permisos `0600`. Se ejecuta automáticamente durante `install.sh` si no existe config previa. En reinstalaciones, el instalador pregunta si querés reconfigurar.
+
+### Archivo de config (manual)
 
 ```bash
 sudo nano /etc/jaimito/config.yaml
@@ -64,11 +82,14 @@ sudo nano /etc/jaimito/config.yaml
 ### Generar una API key
 
 ```bash
-# Opcion A: generar con openssl
-openssl rand -hex 32 | sed 's/^/sk-/'
+# Opcion A: via setup wizard (genera automaticamente)
+sudo jaimito setup
 
 # Opcion B: usar el CLI despues de instalar
 jaimito keys create --name mi-servicio
+
+# Opcion C: generar manualmente con openssl
+openssl rand -hex 32 | sed 's/^/sk-/'
 ```
 
 ### Obtener el chat_id de Telegram
@@ -144,9 +165,9 @@ sudo journalctl -u jaimito --no-pager -n 50
 ```
 
 **Causas comunes:**
-- Config no editada (token de Telegram invalido)
-- `chat_id` incorrecto (el bot no tiene acceso al chat)
-- Puerto 8080 ya en uso → cambiar `server.listen` en config
+- Config no editada (token de Telegram invalido) → ejecutar `sudo jaimito setup`
+- `chat_id` incorrecto (el bot no tiene acceso al chat) → el wizard valida esto automaticamente
+- Puerto 8080 ya en uso → cambiar `server.listen` en config o reconfigurar con `sudo jaimito setup`
 
 ### Notificaciones no llegan a Telegram
 
@@ -176,7 +197,8 @@ sudo chown $(whoami) /var/lib/jaimito/
 
 ```
 objetiva-vps-jaimito/
-├── cmd/jaimito/          # Entrypoint y CLI (main, root, serve, send, wrap, keys)
+├── cmd/jaimito/          # Entrypoint y CLI (main, root, serve, send, wrap, keys, setup)
+│   └── setup/            # Setup wizard interactivo (bubbletea TUI)
 ├── configs/
 │   └── config.example.yaml
 ├── internal/

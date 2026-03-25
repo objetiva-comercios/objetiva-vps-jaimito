@@ -14,6 +14,7 @@ Hub de notificaciones push para VPS. Centraliza todas las alertas generadas en u
 | Migraciones | `adlio/schema` |
 | IDs | `google/uuid` v7 (time-ordered) |
 | Configuración | YAML via `gopkg.in/yaml.v3` |
+| TUI (Setup Wizard) | `charm.land/bubbletea` v2 |
 | Despliegue | systemd, binario estático |
 
 ## Requisitos previos
@@ -25,6 +26,16 @@ Hub de notificaciones push para VPS. Centraliza todas las alertas generadas en u
 
 ## Instalación
 
+### Instalación automática (recomendada)
+
+```bash
+curl -sL https://raw.githubusercontent.com/objetiva-comercios/objetiva-vps-jaimito/main/install.sh | bash
+```
+
+El instalador compila el binario, lo instala en `/usr/local/bin/jaimito`, y lanza el **setup wizard interactivo** que guía la configuración paso a paso: valida el bot token contra Telegram, verifica cada chat ID, genera una API key, y escribe el config YAML automáticamente.
+
+### Instalación manual
+
 ```bash
 # 1. Clonar el repositorio
 git clone https://github.com/objetiva-comercios/objetiva-vps-jaimito.git
@@ -33,19 +44,16 @@ cd objetiva-vps-jaimito
 # 2. Compilar el binario
 go build -o jaimito ./cmd/jaimito
 
-# 3. Crear directorios necesarios
-sudo mkdir -p /etc/jaimito
-sudo mkdir -p /var/lib/jaimito
-sudo chown $USER:$USER /var/lib/jaimito
+# 3. Instalar el binario
+sudo cp jaimito /usr/local/bin/jaimito
 
-# 4. Copiar configuración de ejemplo
+# 4. Ejecutar el setup wizard
+sudo jaimito setup
+
+# O configurar manualmente:
+sudo mkdir -p /etc/jaimito /var/lib/jaimito
 sudo cp configs/config.example.yaml /etc/jaimito/config.yaml
-
-# 5. Editar la configuración con tus datos
 sudo nano /etc/jaimito/config.yaml
-
-# 6. Generar una API key para seed_api_keys
-openssl rand -hex 32 | sed 's/^/sk-/'
 ```
 
 ## Configuración
@@ -110,6 +118,7 @@ Prioridad de resolución: flag `--key`/`--server` > variable de entorno > config
 | Comando | Descripción |
 |---------|-------------|
 | `jaimito` | Inicia el servidor daemon |
+| `jaimito setup` | Wizard interactivo de configuración (valida Telegram, genera API key, escribe config) |
 | `jaimito --config /ruta/config.yaml` | Inicia con config personalizado |
 | `jaimito send "mensaje"` | Envía notificación al canal `general` |
 | `jaimito send -c cron -p high "mensaje"` | Envía con canal y prioridad específicos |
@@ -225,7 +234,18 @@ Las claves se almacenan como hash SHA-256 en la base de datos. La clave raw solo
 │       ├── serve.go           # Servidor daemon (secuencia de inicio)
 │       ├── send.go            # Subcomando send
 │       ├── wrap.go            # Subcomando wrap (monitoreo de cron)
-│       └── keys.go            # Subcomando keys (create/list/revoke)
+│       ├── keys.go            # Subcomando keys (create/list/revoke)
+│       └── setup/             # Setup wizard interactivo (bubbletea TUI)
+│           ├── wizard.go      # Orquestador del wizard
+│           ├── steps.go       # Interfaz de pasos
+│           ├── bot_token_step.go     # Validación bot token
+│           ├── general_channel_step.go  # Canal general
+│           ├── extra_channels_step.go   # Canales adicionales
+│           ├── server_step.go        # Dirección HTTP
+│           ├── database_step.go      # Ruta base de datos
+│           ├── apikey_step.go        # Generación API key
+│           ├── summary_step.go       # Resumen y test notification
+│           └── styles.go             # Estilos TUI
 ├── internal/
 │   ├── api/
 │   │   ├── handlers.go        # POST /api/v1/notify, GET /api/v1/health
@@ -389,9 +409,9 @@ curl -s -X POST http://127.0.0.1:8080/api/v1/notify \
 curl -sL https://raw.githubusercontent.com/objetiva-comercios/objetiva-vps-jaimito/main/install.sh | bash
 ```
 
-El script `install.sh` automatiza todo el flujo: verifica dependencias (Go 1.24+, git, systemd), clona el repositorio, compila el binario, lo instala en `/usr/local/bin/jaimito`, copia la config de ejemplo a `/etc/jaimito/config.yaml`, instala el servicio systemd, y ejecuta un health check.
+El script `install.sh` automatiza todo el flujo: verifica dependencias (Go 1.24+, git, systemd), clona el repositorio, compila el binario, lo instala en `/usr/local/bin/jaimito`, lanza el **setup wizard** (`jaimito setup`) para configurar interactivamente, instala el servicio systemd, y ejecuta un health check.
 
-Es idempotente: si detecta una instalacion previa, detiene el servicio, actualiza el repositorio, recompila, y reinicia.
+Es idempotente: si detecta una instalacion previa, detiene el servicio, actualiza el repositorio, recompila, y ofrece reconfigurar con el wizard.
 
 ### Actualizacion
 
@@ -402,7 +422,21 @@ curl -sL https://raw.githubusercontent.com/objetiva-comercios/objetiva-vps-jaimi
 
 Ver [DEPLOY.md](DEPLOY.md) para documentacion completa de deploy, troubleshooting, y configuracion manual.
 
+### Setup wizard
+
+`jaimito setup` es un wizard interactivo TUI (bubbletea) que guía la configuración inicial:
+
+1. **Bot Token** — Pide el token y lo valida contra la API de Telegram (`getMe`)
+2. **Canal general** — Pide el chat ID y lo valida contra Telegram (`getChat`)
+3. **Canales extra** — Permite agregar canales adicionales (deploys, errors, cron, etc.)
+4. **Dirección HTTP** — Configura la dirección de escucha (default: `127.0.0.1:8080`)
+5. **Base de datos** — Ruta al archivo SQLite (default: `/var/lib/jaimito/jaimito.db`)
+6. **API Key** — Genera automáticamente una clave con prefijo `sk-`
+7. **Resumen** — Muestra la configuración completa y ofrece enviar una notificación de test
+
+El wizard escribe `/etc/jaimito/config.yaml` con permisos `0600`. Se invoca automáticamente durante la instalación con `install.sh`, o manualmente con `sudo jaimito setup`.
+
 ## Estado del proyecto
 
-v1.0 MVP completado — todas las fases finalizadas (3 fases, 10 planes, 17/17 requisitos).
-Funcionalidad completa: HTTP API, Telegram dispatch, CLI companion (`send`, `wrap`, `keys`).
+v1.1 completado — setup wizard interactivo con validación Telegram en vivo.
+Funcionalidad completa: HTTP API, Telegram dispatch, CLI companion (`send`, `wrap`, `keys`, `setup`).
