@@ -161,9 +161,15 @@ func (s *SummaryStep) View(data *SetupData) string {
 
 	// Seccion Canales
 	sb.WriteString("📢 Canales\n")
-	sb.WriteString(HintStyle.Render("  Nombre               Chat ID          Prioridad") + "\n")
+	maxName := 0
 	for _, ch := range data.Channels {
-		sb.WriteString(fmt.Sprintf("  %-20s %-16d %s\n", ch.Name, ch.ChatID, ch.Priority))
+		if len(ch.Name) > maxName {
+			maxName = len(ch.Name)
+		}
+	}
+	fmtStr := fmt.Sprintf("  %%%ds → %%-16d [%%s]\n", maxName)
+	for _, ch := range data.Channels {
+		sb.WriteString(fmt.Sprintf(fmtStr, ch.Name, ch.ChatID, ch.Priority))
 	}
 	sb.WriteString("\n")
 

@@ -416,32 +416,27 @@ func (s *ExtraChannelsStep) View(data *SetupData) string {
 	sb.WriteString(TitleStyle.Render("Canales Extra"))
 	sb.WriteString("\n\n")
 
-	// Mostrar canales extra ya agregados (alineados en columnas)
-	if len(s.extraChannels) > 0 {
+	// Mostrar TODOS los canales (general + extras) alineados en columnas
+	allChannels := append(data.Channels, s.extraChannels...)
+	if len(allChannels) > 0 {
 		sb.WriteString("Canales configurados:\n")
-		// Calcular anchos maximos para alinear columnas
+		// Calcular ancho maximo del nombre
 		maxName := 0
-		maxID := 0
-		for _, ch := range s.extraChannels {
+		for _, ch := range allChannels {
 			if len(ch.Name) > maxName {
 				maxName = len(ch.Name)
 			}
-			idStr := fmt.Sprintf("%d", ch.ChatID)
-			if len(idStr) > maxID {
-				maxID = len(idStr)
-			}
 		}
-		for i, ch := range s.extraChannels {
-			if s.state == stateEditSelect && i == s.editCursor {
-				sb.WriteString(StepActive.Render("> "))
+		fmtStr := fmt.Sprintf("  %%%ds → %%-16d [%%s]\n", maxName)
+		editFmtStr := fmt.Sprintf("> %%%ds → %%-16d [%%s]\n", maxName)
+		for i, ch := range allChannels {
+			isExtra := i >= len(data.Channels)
+			extraIdx := i - len(data.Channels)
+			if s.state == stateEditSelect && isExtra && extraIdx == s.editCursor {
+				sb.WriteString(StepActive.Render(fmt.Sprintf(editFmtStr, ch.Name, ch.ChatID, ch.Priority)))
 			} else {
-				sb.WriteString("  ")
+				sb.WriteString(fmt.Sprintf(fmtStr, ch.Name, ch.ChatID, ch.Priority))
 			}
-			// Nombre right-aligned + flecha + ID left-aligned + prioridad
-			namePad := strings.Repeat(" ", maxName-len(ch.Name))
-			idStr := fmt.Sprintf("%d", ch.ChatID)
-			idPad := strings.Repeat(" ", maxID-len(idStr))
-			sb.WriteString(namePad + ch.Name + " → " + idStr + idPad + "  [" + ch.Priority + "]\n")
 		}
 		sb.WriteString("\n")
 	}
@@ -517,8 +512,8 @@ func (s *ExtraChannelsStep) View(data *SetupData) string {
 		sb.WriteString("\n")
 
 	case stateEditSelect:
-		sb.WriteString("Selecciona el canal a editar:\n\n")
-		sb.WriteString(HintStyle.Render("↑/↓: mover │ Enter: editar │ Esc: volver"))
+		sb.WriteString("Selecciona el canal a editar (↑/↓ + Enter):\n")
+		sb.WriteString(HintStyle.Render("El canal 'general' se edita en el paso anterior (Esc → Esc)"))
 		sb.WriteString("\n")
 
 	case stateEditChatID:
