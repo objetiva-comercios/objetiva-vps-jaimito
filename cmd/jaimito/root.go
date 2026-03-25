@@ -13,7 +13,30 @@ var cfgPath string
 var rootCmd = &cobra.Command{
 	Use:   "jaimito",
 	Short: "VPS push notification hub",
-	Long:  "jaimito centralizes notifications from your VPS and delivers them to Telegram.",
+	Long: `jaimito centraliza notificaciones de tu VPS y las entrega a Telegram.
+
+Ejecutar sin subcomando inicia el servidor daemon.`,
+	Example: `  # Iniciar el servidor
+  jaimito
+  jaimito --config /ruta/config.yaml
+
+  # Configurar interactivamente
+  sudo jaimito setup
+
+  # Enviar notificaciones
+  jaimito send "Backup completado"
+  jaimito send -c cron -p high "Backup fallo"
+  jaimito send -t "Deploy" "v1.2 desplegado en produccion"
+  jaimito send --stdin < /var/log/output.log
+
+  # Monitorear cron jobs (notifica solo si falla)
+  jaimito wrap -- /path/to/backup.sh
+  jaimito wrap -c cron -p high -- certbot renew
+
+  # Gestionar API keys
+  jaimito keys create --name mi-servicio
+  jaimito keys list
+  jaimito keys revoke <id>`,
 	// Bare `jaimito` with no subcommand starts the server daemon.
 	RunE:          runServe,
 	SilenceUsage:  true,
@@ -22,6 +45,7 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgPath, "config", "/etc/jaimito/config.yaml", "path to config file")
+	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 }
 
 // resolveServer returns the server address to connect to.
