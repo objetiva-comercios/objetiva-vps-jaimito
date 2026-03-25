@@ -9,13 +9,14 @@ var (
 	ColorGreen  = lipgloss.Color("#00FF87")
 	ColorRed    = lipgloss.Color("#FF5F56")
 	ColorYellow = lipgloss.Color("#FFBD2E")
-	ColorGray   = lipgloss.Color("#666666")
+	ColorGray   = lipgloss.Color("#999999")
+	ColorWhite  = lipgloss.Color("#FFFFFF")
 )
 
 // Estilos para el sidebar de progreso.
 var (
 	StepActive  = lipgloss.NewStyle().Foreground(ColorCyan).Bold(true)
-	StepDone    = lipgloss.NewStyle().Foreground(ColorGreen)
+	StepDone    = lipgloss.NewStyle().Foreground(ColorGreen).Bold(true)
 	StepPending = lipgloss.NewStyle().Foreground(ColorGray)
 )
 

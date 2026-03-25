@@ -141,7 +141,7 @@ func (m WizardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.confirmExit = true
 			return m, nil
-		case "esc", "up":
+		case "esc":
 			// Reset confirmExit si estaba activo
 			if m.confirmExit {
 				m.confirmExit = false
@@ -250,11 +250,17 @@ func renderLayout(m WizardModel) string {
 		contentLines = append(contentLines, "")
 	}
 
+	const sidebarWidth = 20
 	var layout strings.Builder
 	for i := 0; i < maxLines; i++ {
-		// Padding del sidebar a ancho fijo
-		sbLine := fmt.Sprintf("%-20s", sidebarLines[i])
-		layout.WriteString(sbLine)
+		// Padding ANSI-aware: medir ancho visual, no bytes
+		visWidth := lipgloss.Width(sidebarLines[i])
+		padding := sidebarWidth - visWidth
+		if padding < 0 {
+			padding = 0
+		}
+		layout.WriteString(sidebarLines[i])
+		layout.WriteString(strings.Repeat(" ", padding))
 		layout.WriteString(" ")
 		layout.WriteString(separator)
 		layout.WriteString("  ")
