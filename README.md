@@ -199,8 +199,12 @@ jaimito send -c cron -p high "Backup falló"
 # Con título
 jaimito send -t "Deploy" "v1.2.3 desplegado en producción"
 
-# Desde stdin
-df -h / | jaimito send --stdin -t "Disk Report" -c system
+# Desde stdin — ideal para pipes y scripts
+df -h / | jaimito send --stdin -t "Disco" -c monitoring
+tail -20 /var/log/syslog | jaimito send --stdin -c system
+echo "SELECT count(*) FROM users;" | sqlite3 /path/to/db | jaimito send --stdin -t "Usuarios activos"
+docker ps --format "table {{.Names}}\t{{.Status}}" | jaimito send --stdin -t "Containers" -c monitoring -p low
+{ uptime; free -h | head -2; } | jaimito send --stdin -t "Estado del VPS" -c system
 ```
 
 ### Monitorear cron jobs

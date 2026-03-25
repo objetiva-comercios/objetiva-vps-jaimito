@@ -47,7 +47,10 @@ Flags:
   jaimito send --tags backup,cron "Backup completado"
 
   # Desde stdin (util para pipes)
-  df -h / | jaimito send --stdin -t "Disk Report" -c monitoring`,
+  df -h / | jaimito send --stdin -t "Disco" -c monitoring
+  tail -20 /var/log/syslog | jaimito send --stdin -c system
+  docker ps --format "table {{.Names}}\t{{.Status}}" | jaimito send --stdin -t "Containers" -c monitoring
+  { uptime; free -h | head -2; } | jaimito send --stdin -t "Estado del VPS" -c system`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runSend,
 }
