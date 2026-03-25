@@ -24,10 +24,17 @@ Ejecutar sin subcomando inicia el servidor daemon.`,
   sudo jaimito setup
 
   # Enviar notificaciones
+  #   -c canal    -p prioridad (low/normal/high)    -t titulo
   jaimito send "Backup completado"
   jaimito send -c cron -p high "Backup fallo"
   jaimito send -t "Deploy" "v1.2 desplegado en produccion"
-  jaimito send --stdin < /var/log/output.log
+  jaimito send --tags backup,cron "Backup OK"
+
+  # Desde stdin (pipes)
+  df -h / | jaimito send --stdin -t "Disco" -c monitoring
+  tail -20 /var/log/syslog | jaimito send --stdin -c system
+  docker ps --format "table {{.Names}}\t{{.Status}}" | jaimito send --stdin -t "Containers"
+  { uptime; free -h | head -2; } | jaimito send --stdin -t "Estado del VPS"
 
   # Monitorear cron jobs (notifica solo si falla)
   jaimito wrap -- /path/to/backup.sh
