@@ -229,7 +229,9 @@ func (s *GeneralChannelStep) View(data *SetupData) string {
 	}
 
 	sb.WriteString("\n")
-	sb.WriteString(HintStyle.Render("Envia un mensaje al grupo y visita https://api.telegram.org/bot<TOKEN>/getUpdates para ver el chat_id"))
+	sb.WriteString(HintStyle.Render("Manda un mensaje en el grupo y reenvialo a @RawDataBot."))
+	sb.WriteString("\n")
+	sb.WriteString(HintStyle.Render("Te responde con el chat ID del grupo de origen."))
 	sb.WriteString("\n")
 
 	return sb.String()
