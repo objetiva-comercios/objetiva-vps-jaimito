@@ -21,7 +21,7 @@
 **Milestone Goal:** Eliminar la barrera del config.yaml manual con un wizard interactivo que guia al operador paso a paso, valida todo en vivo contra la API de Telegram, y envia una notificacion de test antes de terminar.
 
 - [x] **Phase 4: Wizard Scaffold** — El operador puede ejecutar `jaimito setup` y el wizard arranca, detecta configs existentes y aborta en terminales no-interactivas (completed 2026-03-25)
-- [ ] **Phase 5: Validacion Telegram** — El operador ingresa bot token y chat IDs con validacion en vivo contra la API de Telegram en cada paso
+- [x] **Phase 5: Validacion Telegram** — El operador ingresa bot token y chat IDs con validacion en vivo contra la API de Telegram en cada paso (completed 2026-03-25)
 - [ ] **Phase 6: Configuracion y Escritura** — El wizard genera una API key criptografica, valida el config completo y lo escribe a disco con permisos correctos
 - [ ] **Phase 7: Verificacion e Integracion** — El wizard envia una notificacion de test que confirma el setup, e install.sh invoca el wizard automaticamente en instalaciones nuevas
 
@@ -55,7 +55,7 @@ Plans:
 
 Plans:
 - [x] 05-01-PLAN.md — ValidateTokenWithInfo() en telegram/client.go + BotTokenStep con validacion async, spinner, sequence number y modo edit
-- [ ] 05-02-PLAN.md — GeneralChannelStep y ExtraChannelsStep con validacion async de chat IDs, loop de canales extra con maquina de estados
+- [x] 05-02-PLAN.md — GeneralChannelStep y ExtraChannelsStep con validacion async de chat IDs, loop de canales extra con maquina de estados
 
 ### Phase 6: Configuracion y Escritura
 **Goal**: El wizard genera y escribe un archivo de configuracion valido que jaimito puede usar inmediatamente al arrancar
@@ -94,6 +94,6 @@ Plans:
 | 2. Core Pipeline | v1.0 | 4/4 | Complete | 2026-02-21 |
 | 3. CLI and Developer Experience | v1.0 | 3/3 | Complete | 2026-02-23 |
 | 4. Wizard Scaffold | v1.1 | 2/2 | Complete   | 2026-03-25 |
-| 5. Validacion Telegram | v1.1 | 1/2 | In Progress|  |
+| 5. Validacion Telegram | v1.1 | 2/2 | Complete   | 2026-03-25 |
 | 6. Configuracion y Escritura | v1.1 | 0/2 | Not started | - |
 | 7. Verificacion e Integracion | v1.1 | 0/2 | Not started | - |
