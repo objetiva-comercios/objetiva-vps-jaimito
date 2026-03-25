@@ -217,8 +217,20 @@ echo "  sudo systemctl status ${SERVICE_NAME}     # Estado"
 echo "  sudo journalctl -u ${SERVICE_NAME} -f     # Logs en vivo"
 echo "  sudo systemctl restart ${SERVICE_NAME}     # Reiniciar"
 echo ""
+# Extraer API key del config para mostrar el export listo
+API_KEY=$(grep -A1 'seed_api_keys' "${CONFIG_FILE}" 2>/dev/null | grep 'key:' | head -1 | sed 's/.*key: *"\{0,1\}\([^"]*\)"\{0,1\}/\1/' | xargs)
+if [ -n "$API_KEY" ] && [ "$API_KEY" != "sk-REPLACE_ME_WITH_A_REAL_KEY" ]; then
+    echo -e "${CYAN}API Key (copiar y guardar):${NC}"
+    echo -e "  ${YELLOW}export JAIMITO_API_KEY=${API_KEY}${NC}"
+    echo ""
+    # Agregar al .bashrc si no esta
+    if ! grep -q "JAIMITO_API_KEY" "$HOME/.bashrc" 2>/dev/null; then
+        echo "export JAIMITO_API_KEY=${API_KEY}" >> "$HOME/.bashrc"
+        ok "API key agregada a ~/.bashrc (disponible en nuevas sesiones)"
+    fi
+    echo ""
+fi
 echo -e "${CYAN}Enviar notificacion:${NC}"
-echo "  export JAIMITO_API_KEY=sk-tu-key-aqui"
 echo "  jaimito send \"Hola desde el VPS\""
 echo "  jaimito send -c deploys -p high \"Deploy exitoso\""
 echo ""
