@@ -7,6 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	lipgloss "charm.land/lipgloss/v2"
+	"github.com/go-telegram/bot"
 	"golang.org/x/term"
 
 	"github.com/chiguire/jaimito/internal/config"
@@ -20,6 +21,13 @@ type SetupData struct {
 	ConfigErr    error          // error de carga si config es invalido
 	ConfigExists bool           // true si el archivo de config existe en disco
 	Mode         string         // "new", "edit", "fresh"
+
+	// Campos del bot de Telegram (populados por BotTokenStep)
+	BotToken       string              // token validado (plain text)
+	BotUsername    string              // @username del bot (sin @)
+	BotDisplayName string              // FirstName del bot
+	ValidatedBot   *bot.Bot            // instancia reutilizable para GetChat en steps siguientes
+	Channels       []config.ChannelConfig // canales acumulados (general + extras)
 }
 
 // Step es la interfaz que implementa cada pantalla del wizard.
@@ -73,7 +81,7 @@ func NewWizardModelWithExists(cfgPath string, existingCfg *config.Config, config
 	// Steps visibles en la sidebar (los 7 del wizard)
 	visibleSteps := []Step{
 		&WelcomeStep{},
-		&PlaceholderStep{name: "Bot Token"},
+		&BotTokenStep{},
 		&PlaceholderStep{name: "Canal General"},
 		&PlaceholderStep{name: "Canales Extra"},
 		&PlaceholderStep{name: "Servidor"},
