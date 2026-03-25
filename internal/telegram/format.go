@@ -44,15 +44,15 @@ func FormatMessage(msg *db.Message) string {
 	}
 
 	// Tags as hashtags on a new line.
-	// CRITICAL: write '#' literally — do NOT pass "#tag" through EscapeMarkdown
-	// because '#' is in the shouldBeEscaped set and would become '\#'.
+	// '#' MUST be escaped as '\#' in MarkdownV2 — Telegram rejects unescaped '#'.
+	// The rendered message still shows '#tag' correctly in the chat.
 	if len(msg.Tags) > 0 {
 		sb.WriteString("\n")
 		for i, tag := range msg.Tags {
 			if i > 0 {
 				sb.WriteString(" ")
 			}
-			sb.WriteString("#")
+			sb.WriteString("\\#")
 			sb.WriteString(bot.EscapeMarkdown(tag))
 		}
 	}

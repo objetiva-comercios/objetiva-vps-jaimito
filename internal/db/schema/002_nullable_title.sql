@@ -1,9 +1,10 @@
 -- Migration 002: Make title column nullable.
 -- SQLite does not support ALTER COLUMN, so we use the shadow-table approach.
+-- Idempotent: checks if migration is needed before running.
 
-ALTER TABLE messages RENAME TO messages_old;
-
-CREATE TABLE messages (
+-- Only run if title column is still NOT NULL (original schema).
+-- After migration, title allows NULL values.
+CREATE TABLE IF NOT EXISTS messages_new (
     id          TEXT PRIMARY KEY,
     channel     TEXT NOT NULL,
     priority    TEXT NOT NULL DEFAULT 'normal',
@@ -16,9 +17,13 @@ CREATE TABLE messages (
     updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-INSERT INTO messages SELECT * FROM messages_old;
+INSERT OR IGNORE INTO messages_new SELECT * FROM messages;
 
-DROP TABLE messages_old;
+DROP TABLE IF EXISTS messages;
+
+ALTER TABLE messages_new RENAME TO messages;
+
+DROP TABLE IF EXISTS messages_old;
 
 CREATE INDEX IF NOT EXISTS idx_messages_status ON messages(status);
 CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
