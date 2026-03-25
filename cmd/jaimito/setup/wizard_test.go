@@ -54,34 +54,28 @@ func TestWelcomeStep_Done(t *testing.T) {
 	}
 }
 
-// TestWizardModel_Sidebar verifica que el View() del WizardModel contiene
-// el indicador de step activo '▸', el contador '[1/8]', y los 8 nombres de steps.
-func TestWizardModel_Sidebar(t *testing.T) {
+// TestWizardModel_ProgressBar verifica que el View() del WizardModel contiene
+// la barra de progreso con el nombre del step actual, el contador, y los dots.
+func TestWizardModel_ProgressBar(t *testing.T) {
 	model := setup.NewWizardModel("/etc/jaimito/config.yaml", nil, nil)
 	view := model.View()
 	viewStr := view.Content
 
-	if !strings.Contains(viewStr, "▸") {
-		t.Error("Sidebar debe contener '▸' para el step activo")
+	// Debe mostrar el nombre del step actual
+	if !strings.Contains(viewStr, "Bienvenida") {
+		t.Error("Progress bar debe contener el nombre del step actual 'Bienvenida'")
 	}
-	if !strings.Contains(viewStr, "[1/8]") {
-		t.Error("Sidebar debe contener '[1/8]' como contador")
+	// Debe mostrar el contador "Paso 1 de 8"
+	if !strings.Contains(viewStr, "Paso 1 de 8") {
+		t.Error("Progress bar debe contener 'Paso 1 de 8'")
 	}
-
-	expectedSteps := []string{
-		"Bienvenida",
-		"Bot Token",
-		"Canal General",
-		"Canales Extra",
-		"Servidor",
-		"Base de Datos",
-		"API Key",
-		"Resumen",
+	// Debe contener el dot activo
+	if !strings.Contains(viewStr, "◉") {
+		t.Error("Progress bar debe contener '◉' para el step activo")
 	}
-	for _, name := range expectedSteps {
-		if !strings.Contains(viewStr, name) {
-			t.Errorf("Sidebar debe contener el step %q", name)
-		}
+	// Debe contener dots pendientes
+	if !strings.Contains(viewStr, "○") {
+		t.Error("Progress bar debe contener '○' para steps pendientes")
 	}
 }
 
@@ -136,18 +130,12 @@ func TestWizardModel_BackNavigation(t *testing.T) {
 	escMsg := tea.KeyPressMsg{Code: tea.KeyEscape}
 	model3, _ := model2.Update(escMsg)
 
-	// Verificar que volvimos al step 1: '▸' deberia estar en 'Bienvenida'
+	// Verificar que volvimos al step 1: la barra de progreso debe mostrar 'Bienvenida'
 	view3 := model3.View().Content
-	// El sidebar debe mostrar '▸' antes de 'Bienvenida'
-	idx := strings.Index(view3, "▸")
-	idxBienvenida := strings.Index(view3, "Bienvenida")
-	if idx == -1 {
-		t.Error("Despues de Esc, sidebar debe contener '▸'")
+	if !strings.Contains(view3, "Bienvenida") {
+		t.Error("Despues de Esc, progress bar debe mostrar 'Bienvenida'")
 	}
-	if idxBienvenida == -1 {
-		t.Error("Despues de Esc, sidebar debe contener 'Bienvenida'")
-	}
-	if idx > idxBienvenida+20 {
-		t.Errorf("Despues de Esc, '▸' debe estar cerca de 'Bienvenida'; idx▸=%d, idxBienvenida=%d", idx, idxBienvenida)
+	if !strings.Contains(view3, "Paso 1 de 8") {
+		t.Error("Despues de Esc, progress bar debe mostrar 'Paso 1 de 8'")
 	}
 }

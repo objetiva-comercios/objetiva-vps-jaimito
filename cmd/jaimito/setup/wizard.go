@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	lipgloss "charm.land/lipgloss/v2"
 	"github.com/go-telegram/bot"
 	"golang.org/x/term"
 
@@ -188,91 +187,64 @@ func (m WizardModel) View() tea.View {
 	return tea.NewView(content)
 }
 
-// renderSidebar genera la barra lateral con los steps y su estado.
-// sidebarStep es el indice del step activo dentro de stepNames (ya ajustado por offset).
-// completedSteps es el mapa de steps completados (indices en el slice de steps del model).
-// sidebarOffset es la cantidad de steps internos antes del primer step visible.
-func renderSidebar(sidebarStep int, completedSteps map[int]bool, sidebarOffset int) string {
+// renderProgressBar genera la barra de progreso superior con dots y nombre del step.
+func renderProgressBar(sidebarStep int, completedSteps map[int]bool, sidebarOffset int) string {
 	var sb strings.Builder
 
-	for i, name := range stepNames {
-		// Convertir indice de sidebar a indice en steps slice
-		stepsIdx := i + sidebarOffset
-		var line string
-		if i == sidebarStep {
-			// El step activo siempre se muestra como activo, incluso si fue completado antes
-			line = StepActive.Render("▸ " + name)
-		} else if completedSteps[stepsIdx] {
-			line = StepDone.Render("✓ " + name)
-		} else {
-			line = StepPending.Render("  " + name)
-		}
-		sb.WriteString(line)
-		sb.WriteString("\n")
+	// Linea 1: nombre del step actual con contador
+	stepName := "jaimito setup"
+	if sidebarStep >= 0 && sidebarStep < len(stepNames) {
+		stepName = stepNames[sidebarStep]
 	}
+	header := fmt.Sprintf("Paso %d de %d", sidebarStep+1, len(stepNames))
+	sb.WriteString(TitleStyle.Render(header))
+	sb.WriteString(HintStyle.Render(" — "))
+	sb.WriteString(TitleStyle.Render(stepName))
+	sb.WriteString("\n")
 
-	// Contador dinamico [N/8]
-	counter := fmt.Sprintf("[%d/%d]", sidebarStep+1, len(stepNames))
-	sb.WriteString(HintStyle.Render(counter))
+	// Linea 2: dots de progreso (● completado, ◉ actual, ○ pendiente)
+	for i := range stepNames {
+		stepsIdx := i + sidebarOffset
+		if i > 0 {
+			sb.WriteString(" ")
+		}
+		if i == sidebarStep {
+			sb.WriteString(StepActive.Render("◉"))
+		} else if completedSteps[stepsIdx] {
+			sb.WriteString(StepDone.Render("●"))
+		} else {
+			sb.WriteString(StepPending.Render("○"))
+		}
+	}
+	sb.WriteString("\n")
+
+	// Linea 3: separador horizontal
+	sb.WriteString(HintStyle.Render("────────────────────────────────────────────────"))
 	sb.WriteString("\n")
 
 	return sb.String()
 }
 
-// renderLayout compone el layout completo: sidebar + separador + contenido del step.
+// renderLayout compone el layout completo: barra de progreso + contenido del step + hints.
 func renderLayout(m WizardModel) string {
-	// Calcular el indice de sidebar: currentStep menos los steps internos antes de la sidebar
 	sidebarStep := m.currentStep - m.sidebarOffset
 	if sidebarStep < 0 {
 		sidebarStep = 0
 	}
-	sidebar := renderSidebar(sidebarStep, m.completedMap, m.sidebarOffset)
+
+	var layout strings.Builder
+
+	// Barra de progreso superior
+	layout.WriteString(renderProgressBar(sidebarStep, m.completedMap, m.sidebarOffset))
+	layout.WriteString("\n")
 
 	// Contenido del step actual
 	stepContent := m.steps[m.currentStep].View(m.data)
-
-	// Separador vertical
-	separator := lipgloss.NewStyle().Foreground(ColorGray).Render("│")
-
-	// Unir sidebar + separador + contenido
-	sidebarLines := strings.Split(sidebar, "\n")
-	contentLines := strings.Split(stepContent, "\n")
-
-	// Rellenar el sidebar hasta la altura del contenido si es necesario
-	maxLines := len(sidebarLines)
-	if len(contentLines) > maxLines {
-		maxLines = len(contentLines)
-	}
-	for len(sidebarLines) < maxLines {
-		sidebarLines = append(sidebarLines, "")
-	}
-	for len(contentLines) < maxLines {
-		contentLines = append(contentLines, "")
-	}
-
-	const sidebarWidth = 20
-	var layout strings.Builder
-	for i := 0; i < maxLines; i++ {
-		// Padding ANSI-aware: medir ancho visual, no bytes
-		visWidth := lipgloss.Width(sidebarLines[i])
-		padding := sidebarWidth - visWidth
-		if padding < 0 {
-			padding = 0
-		}
-		layout.WriteString(sidebarLines[i])
-		layout.WriteString(strings.Repeat(" ", padding))
-		layout.WriteString(" ")
-		layout.WriteString(separator)
-		layout.WriteString("  ")
-		if i < len(contentLines) {
-			layout.WriteString(contentLines[i])
-		}
-		layout.WriteString("\n")
-	}
+	layout.WriteString(stepContent)
+	layout.WriteString("\n")
 
 	// Barra de atajos inferior
 	hints := HintStyle.Render("Enter: continuar  │  Esc: volver  │  Ctrl+C: salir")
-	layout.WriteString("\n")
 	layout.WriteString(hints)
 	layout.WriteString("\n")
 
