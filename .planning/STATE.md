@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Setup Wizard
-status: Ready to plan
-stopped_at: Completed 04-02-PLAN.md
-last_updated: "2026-03-25T00:45:52.323Z"
+status: Ready to execute
+stopped_at: Completed 05-validacion-telegram 05-01-PLAN.md
+last_updated: "2026-03-25T12:07:43.771Z"
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  total_plans: 4
+  completed_plans: 3
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** Every event that happens on the VPS gets reliably captured and delivered to Telegram — no notification is ever lost silently.
-**Current focus:** Phase 04 — wizard-scaffold
+**Current focus:** Phase 05 — validacion-telegram
 
 ## Current Position
 
-Phase: 5
-Plan: Not started
+Phase: 05 (validacion-telegram) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -46,6 +46,7 @@ Plan: Not started
 
 | Phase 04-wizard-scaffold P01 | 8 | 1 tasks | 8 files |
 | Phase 04-wizard-scaffold P02 | 4 | 1 tasks | 4 files |
+| Phase 05-validacion-telegram P01 | 20 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -63,6 +64,8 @@ Decisiones relevantes para v1.1:
 - [Phase 04-01]: .gitignore: patron /jaimito (con slash) en vez de jaimito para no ignorar el directorio cmd/jaimito/
 - [Phase 04-02]: sidebarOffset en WizardModel para steps internos (DetectConfigStep) sin afectar sidebar de 7 steps visibles
 - [Phase 04-02]: ConfigExists bool en SetupData separa deteccion del archivo de la validacion del contenido
+- [Phase 05-validacion-telegram]: Test helpers exportados en BotTokenStep (SetValidationState, NewTokenValidationResultMsg) para testear async desde package externo sin exponer campos internos
+- [Phase 05-validacion-telegram]: Patron async establecido: tokenValidationResultMsg + seq number anti-stale + spinner.TickMsg + validateTokenCmd con 10s timeout y panic recovery
 
 ### Pending Todos
 
@@ -74,6 +77,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-25T00:42:43.070Z
-Stopped at: Completed 04-02-PLAN.md
+Last session: 2026-03-25T12:07:43.767Z
+Stopped at: Completed 05-validacion-telegram 05-01-PLAN.md
 Resume file: None

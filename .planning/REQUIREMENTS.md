@@ -15,7 +15,7 @@ Requirements for the Setup Wizard milestone. Each maps to roadmap phases.
 
 ### Validación Telegram
 
-- [ ] **TELE-01**: Operador ingresa bot token y se valida en vivo contra API (retorna username y display name)
+- [x] **TELE-01**: Operador ingresa bot token y se valida en vivo contra API (retorna username y display name)
 - [ ] **TELE-02**: Operador ingresa chat ID del canal general y se valida contra `bot.GetChat()`
 - [ ] **TELE-03**: Operador puede agregar canales extra (deploys, errors, cron, etc.) con validación de cada chat ID
 
@@ -76,7 +76,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WIZ-01 | Phase 4 | Complete |
 | WIZ-02 | Phase 4 | Complete |
 | WIZ-03 | Phase 4 | Complete |
-| TELE-01 | Phase 5 | Pending |
+| TELE-01 | Phase 5 | Complete |
 | TELE-02 | Phase 5 | Pending |
 | TELE-03 | Phase 5 | Pending |
 | CONF-01 | Phase 6 | Pending |

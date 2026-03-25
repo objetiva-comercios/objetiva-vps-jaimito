@@ -54,7 +54,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — ValidateTokenWithInfo() en telegram/client.go + BotTokenStep con validacion async, spinner, sequence number y modo edit
+- [x] 05-01-PLAN.md — ValidateTokenWithInfo() en telegram/client.go + BotTokenStep con validacion async, spinner, sequence number y modo edit
 - [ ] 05-02-PLAN.md — GeneralChannelStep y ExtraChannelsStep con validacion async de chat IDs, loop de canales extra con maquina de estados
 
 ### Phase 6: Configuracion y Escritura
@@ -94,6 +94,6 @@ Plans:
 | 2. Core Pipeline | v1.0 | 4/4 | Complete | 2026-02-21 |
 | 3. CLI and Developer Experience | v1.0 | 3/3 | Complete | 2026-02-23 |
 | 4. Wizard Scaffold | v1.1 | 2/2 | Complete   | 2026-03-25 |
-| 5. Validacion Telegram | v1.1 | 0/2 | Not started | - |
+| 5. Validacion Telegram | v1.1 | 1/2 | In Progress|  |
 | 6. Configuracion y Escritura | v1.1 | 0/2 | Not started | - |
 | 7. Verificacion e Integracion | v1.1 | 0/2 | Not started | - |
