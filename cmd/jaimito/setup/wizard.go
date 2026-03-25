@@ -94,7 +94,7 @@ func NewWizardModelWithExists(cfgPath string, existingCfg *config.Config, config
 		&ServerStep{},
 		&DatabaseStep{},
 		&APIKeyStep{},
-		&PlaceholderStep{name: "Resumen"}, // TEMPORAL — plan 06-02 lo reemplaza con SummaryStep
+		&SummaryStep{},
 	}
 
 	// Si hay config (valido o invalido), insertar DetectConfigStep como step 0 (interno).
