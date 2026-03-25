@@ -2,16 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Setup Wizard
-status: active
-stopped_at: ""
-last_updated: "2026-03-24"
-last_activity: "2026-03-24 — Roadmap v1.1 creado, 4 fases definidas (4-7)"
+status: Ready to execute
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-03-25T00:35:35.510Z"
 progress:
   total_phases: 4
   completed_phases: 0
-  total_plans: 8
-  completed_plans: 0
-  percent: 0
+  total_plans: 2
+  completed_plans: 1
 ---
 
 # Project State
@@ -21,20 +19,17 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** Every event that happens on the VPS gets reliably captured and delivered to Telegram — no notification is ever lost silently.
-**Current focus:** v1.1 Setup Wizard — Phase 4: Wizard Scaffold
+**Current focus:** Phase 04 — wizard-scaffold
 
 ## Current Position
 
-Phase: 4 of 7 (Wizard Scaffold)
-Plan: 0 of 2 en fase actual
-Status: Ready to plan
-Last activity: 2026-03-24 — Roadmap v1.1 creado, 4 fases definidas (4-7)
-
-Progress: [░░░░░░░░░░] 0%
+Phase: 04 (wizard-scaffold) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
 **Velocity:**
+
 - Total plans completed: 0 (v1.1)
 - Average duration: — (sin datos v1.1)
 - Total execution time: —
@@ -46,7 +41,10 @@ Progress: [░░░░░░░░░░] 0%
 | 4. Wizard Scaffold | 0/2 | — | — |
 
 **Recent Trend:**
+
 - Sin datos v1.1 todavia
+
+| Phase 04-wizard-scaffold P01 | 8 | 1 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -54,10 +52,14 @@ Progress: [░░░░░░░░░░] 0%
 
 Decisions are logged in PROJECT.md Key Decisions table.
 Decisiones relevantes para v1.1:
+
 - Nuevas dependencias: bubbletea v2, bubbles v2, lipgloss v2, golang.org/x/term
 - Dos modificaciones internas necesarias: `telegram.ValidateTokenWithInfo()` y `db.GenerateRawKey()`
 - Wizard usa maquina de estados lineal con 12 estados internos y 7 steps visibles
 - install.sh usa redireccion `/dev/tty` para compatibilidad con `curl | bash`
+- [Phase 04-01]: Step interface simple (no tea.Model anidados) para evitar complejidad de message-passing entre steps del wizard
+- [Phase 04-01]: renderSidebar prioriza step activo sobre completedMap para navegacion correcta hacia atras con Esc
+- [Phase 04-01]: .gitignore: patron /jaimito (con slash) en vez de jaimito para no ignorar el directorio cmd/jaimito/
 
 ### Pending Todos
 
@@ -69,6 +71,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-24
-Stopped at: Roadmap v1.1 creado. Siguiente: plan-phase 4.
+Last session: 2026-03-25T00:35:35.506Z
+Stopped at: Completed 04-01-PLAN.md
 Resume file: None

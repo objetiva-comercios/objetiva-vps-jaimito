@@ -9,9 +9,9 @@ Requirements for the Setup Wizard milestone. Each maps to roadmap phases.
 
 ### Wizard TUI
 
-- [ ] **WIZ-01**: Operador puede ejecutar `jaimito setup` y ver un wizard interactivo paso-a-paso
+- [x] **WIZ-01**: Operador puede ejecutar `jaimito setup` y ver un wizard interactivo paso-a-paso
 - [ ] **WIZ-02**: Wizard detecta si ya existe config y ofrece editar/crear desde cero/cancelar
-- [ ] **WIZ-03**: Wizard detecta terminal no-interactiva y aborta con error descriptivo
+- [x] **WIZ-03**: Wizard detecta terminal no-interactiva y aborta con error descriptivo
 
 ### Validación Telegram
 
@@ -73,9 +73,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| WIZ-01 | Phase 4 | Pending |
+| WIZ-01 | Phase 4 | Complete |
 | WIZ-02 | Phase 4 | Pending |
-| WIZ-03 | Phase 4 | Pending |
+| WIZ-03 | Phase 4 | Complete |
 | TELE-01 | Phase 5 | Pending |
 | TELE-02 | Phase 5 | Pending |
 | TELE-03 | Phase 5 | Pending |

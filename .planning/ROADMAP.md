@@ -39,7 +39,7 @@
 **Plans**: 2 plans
 
 Plans:
-- [ ] 04-01-PLAN.md — Dependencias TUI, cobra setup command, terminal detection, wizard model con Step interface, welcome step, sidebar de progreso
+- [x] 04-01-PLAN.md — Dependencias TUI, cobra setup command, terminal detection, wizard model con Step interface, welcome step, sidebar de progreso
 - [ ] 04-02-PLAN.md — DetectConfigStep con tres ramas (valido/invalido/inexistente), resumen compacto, backup automatico
 
 ### Phase 5: Validacion Telegram
@@ -93,7 +93,7 @@ Plans:
 | 1. Foundation | v1.0 | 3/3 | Complete | 2026-02-21 |
 | 2. Core Pipeline | v1.0 | 4/4 | Complete | 2026-02-21 |
 | 3. CLI and Developer Experience | v1.0 | 3/3 | Complete | 2026-02-23 |
-| 4. Wizard Scaffold | v1.1 | 0/2 | Not started | - |
+| 4. Wizard Scaffold | v1.1 | 1/2 | In Progress|  |
 | 5. Validacion Telegram | v1.1 | 0/2 | Not started | - |
 | 6. Configuracion y Escritura | v1.1 | 0/2 | Not started | - |
 | 7. Verificacion e Integracion | v1.1 | 0/2 | Not started | - |
