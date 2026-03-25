@@ -32,7 +32,7 @@ Requirements for the Setup Wizard milestone. Each maps to roadmap phases.
 
 ### Integración
 
-- [ ] **INST-01**: `install.sh` invoca `jaimito setup` automáticamente cuando no existe config (con `< /dev/tty`)
+- [x] **INST-01**: `install.sh` invoca `jaimito setup` automáticamente cuando no existe config (con `< /dev/tty`)
 
 ## Future Requirements
 
@@ -84,7 +84,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONF-03 | Phase 6 | Complete |
 | CONF-04 | Phase 6 | Complete |
 | TEST-01 | Phase 7 | Complete |
-| INST-01 | Phase 7 | Pending |
+| INST-01 | Phase 7 | Complete |
 
 **Coverage:**
 - v1.1 requirements: 12 total
