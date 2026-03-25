@@ -1,65 +1,151 @@
 package setup
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
+	"github.com/go-telegram/bot"
 	"gopkg.in/yaml.v3"
 
 	"github.com/chiguire/jaimito/internal/config"
 )
 
+// testNotificationResultMsg es el resultado de la notificacion de test async post-escritura.
+type testNotificationResultMsg struct {
+	err error
+}
+
+// TestNotificationResultMsg es la version exportada para tests.
+type TestNotificationResultMsg = testNotificationResultMsg
+
+// NewTestNotificationResultMsg crea un testNotificationResultMsg para uso en tests.
+func NewTestNotificationResultMsg(err error) testNotificationResultMsg {
+	return testNotificationResultMsg{err: err}
+}
+
+// sendTestNotificationCmd envia un mensaje de test a Telegram con timeout de 10s.
+// Defensive: si el bot es nil retorna error limpio (no panic).
+func sendTestNotificationCmd(b *bot.Bot, chatID int64, hostname string) tea.Cmd {
+	return func() tea.Msg {
+		defer func() {
+			if r := recover(); r != nil {
+				_ = r
+			}
+		}()
+		if b == nil {
+			return testNotificationResultMsg{err: fmt.Errorf("bot no disponible")}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID: chatID,
+			Text:   "\u2705 jaimito configurado correctamente en " + hostname,
+		})
+		return testNotificationResultMsg{err: err}
+	}
+}
+
 // SummaryStep es la pantalla final del wizard: muestra el resumen completo de la
 // configuracion, valida con config.Validate(), y escribe el YAML a disco.
+// Fase 7: despues de escribir, envia una notificacion de test a Telegram.
 type SummaryStep struct {
 	confirmed   bool   // operador presiono Enter
 	writeErr    string // error de escritura
 	validateErr string // error de config.Validate()
 	writtenPath string // path donde se escribio el config
 	done        bool
+
+	// Phase 7: notificacion de test
+	spinner spinner.Model
+	sending bool   // true mientras se envia la notificacion de test
+	testOk  bool   // true si la notificacion fue exitosa
+	testErr string // mensaje de error si fallo (no bloqueante)
 }
 
-// Init implementa Step. No hay operaciones async — todo se lee de SetupData en View().
+// IsSending retorna true mientras se esta enviando la notificacion de test.
+// Expuesto para tests externos.
+func (s *SummaryStep) IsSending() bool {
+	return s.sending
+}
+
+// Init implementa Step. Inicializa el spinner.
 func (s *SummaryStep) Init(data *SetupData) tea.Cmd {
+	s.spinner = spinner.New(spinner.WithSpinner(spinner.Dot))
 	return nil
 }
 
 // Update implementa Step.
-// En "enter": intenta writeConfig. Si falla, muestra error. Si ok, retorna tea.Quit.
+// Maneja: spinner ticks, resultado de notificacion de test, y tecla Enter.
 func (s *SummaryStep) Update(msg tea.Msg, data *SetupData) (Step, tea.Cmd) {
-	kp, ok := msg.(tea.KeyPressMsg)
-	if !ok {
-		return s, nil
-	}
-
-	if kp.String() == "enter" {
-		// Limpiar errores previos antes de reintentar
-		s.writeErr = ""
-		s.validateErr = ""
-
-		err := writeConfig(data)
-		if err != nil {
-			errStr := err.Error()
-			if strings.HasPrefix(errStr, "validacion:") {
-				s.validateErr = errStr
-			} else {
-				s.writeErr = errStr
-			}
-			return s, nil
+	switch msg := msg.(type) {
+	case spinner.TickMsg:
+		// Solo procesar tick cuando estamos enviando (Pitfall W3: spinner se detiene sin ticks)
+		if s.sending {
+			var cmd tea.Cmd
+			s.spinner, cmd = s.spinner.Update(msg)
+			return s, cmd
 		}
+		return s, nil
 
-		s.writtenPath = data.ConfigPath
+	case testNotificationResultMsg:
+		s.sending = false
+		if msg.err != nil {
+			s.testErr = msg.err.Error()
+		} else {
+			s.testOk = true
+		}
 		s.done = true
 		return s, tea.Quit
+
+	case tea.KeyPressMsg:
+		if msg.String() == "enter" {
+			// Limpiar errores previos antes de reintentar
+			s.writeErr = ""
+			s.validateErr = ""
+
+			err := writeConfig(data)
+			if err != nil {
+				errStr := err.Error()
+				if strings.HasPrefix(errStr, "validacion:") {
+					s.validateErr = errStr
+				} else {
+					s.writeErr = errStr
+				}
+				return s, nil
+			}
+
+			s.writtenPath = data.ConfigPath
+
+			// Defensive: sin canales no podemos enviar test
+			if len(data.Channels) == 0 {
+				s.testErr = "sin canales configurados"
+				s.done = true
+				return s, tea.Quit
+			}
+
+			// Iniciar envio de test automatico (D-01: post-escritura exitosa)
+			hostname, _ := os.Hostname()
+			if hostname == "" {
+				hostname = "VPS"
+			}
+			s.sending = true
+			return s, tea.Batch(
+				sendTestNotificationCmd(data.ValidatedBot, data.Channels[0].ChatID, hostname),
+				s.spinner.Tick,
+			)
+		}
 	}
 
 	return s, nil
 }
 
-// View implementa Step. Renderiza el resumen completo con 5 secciones.
+// View implementa Step. Renderiza el resumen completo con 5 secciones y estado final.
 func (s *SummaryStep) View(data *SetupData) string {
 	var sb strings.Builder
 
@@ -100,10 +186,21 @@ func (s *SummaryStep) View(data *SetupData) string {
 	}
 	sb.WriteString("\n")
 
-	// Estado final
-	if s.done {
+	// Estado final — tres estados nuevos de Phase 7
+	if s.sending {
+		// Enviando notificacion de test: mostrar config escrita + spinner
 		sb.WriteString(StepDone.Render("✓ Configuracion escrita en "+s.writtenPath) + "\n\n")
+		sb.WriteString(s.spinner.View() + " Enviando notificacion de test...\n")
+	} else if s.testOk {
+		// Test exitoso: checkmark verde + hint systemctl
+		sb.WriteString(StepDone.Render("✓ Configuracion escrita en "+s.writtenPath) + "\n")
+		sb.WriteString(StepDone.Render("✓ Notificacion de test enviada a Telegram") + "\n\n")
 		sb.WriteString(HintStyle.Render("Para iniciar jaimito: sudo systemctl start jaimito") + "\n")
+	} else if s.testErr != "" {
+		// Test fallido: warning amarillo (no bloqueante — D-04)
+		sb.WriteString(StepDone.Render("✓ Configuracion escrita en "+s.writtenPath) + "\n")
+		sb.WriteString(WarningStyle.Render("⚠ Notificacion de test fallida: "+s.testErr) + "\n\n")
+		sb.WriteString(HintStyle.Render("El config es valido. Podes iniciar: sudo systemctl start jaimito") + "\n")
 	} else if s.validateErr != "" {
 		sb.WriteString(ErrorStyle.Render("Error de validacion: "+s.validateErr) + "\n\n")
 		sb.WriteString(HintStyle.Render("El archivo NO fue escrito. Usa Esc para corregir los valores.") + "\n")
