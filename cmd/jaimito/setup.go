@@ -29,8 +29,15 @@ func runSetup(cmd *cobra.Command, args []string) error {
 		os.Exit(1)
 	}
 
-	// Detectar config existente — guardar tanto cfg como err
-	cfg, configErr := config.Load(cfgPath)
+	// Detectar si el archivo de config existe antes de intentar cargarlo
+	_, statErr := os.Stat(cfgPath)
+	configExists := !os.IsNotExist(statErr)
 
-	return setup.RunWizard(cfgPath, cfg, configErr)
+	var cfg *config.Config
+	var configErr error
+	if configExists {
+		cfg, configErr = config.Load(cfgPath)
+	}
+
+	return setup.RunWizardWithExists(cfgPath, cfg, configErr, configExists)
 }

@@ -15,10 +15,11 @@ import (
 // SetupData contiene todos los valores recopilados por el wizard.
 // Se pasa por puntero a cada step — mutacion directa, sin message-passing.
 type SetupData struct {
-	ConfigPath  string
-	ExistingCfg *config.Config // nil si no existe
-	ConfigErr   error          // error de carga si config es invalido
-	Mode        string         // "new", "edit", "fresh"
+	ConfigPath   string
+	ExistingCfg  *config.Config // nil si no existe
+	ConfigErr    error          // error de carga si config es invalido
+	ConfigExists bool           // true si el archivo de config existe en disco
+	Mode         string         // "new", "edit", "fresh"
 }
 
 // Step es la interfaz que implementa cada pantalla del wizard.
@@ -43,23 +44,34 @@ var stepNames = []string{
 
 // WizardModel es el unico tea.Model del wizard.
 type WizardModel struct {
-	steps        []Step
-	currentStep  int
-	data         *SetupData
-	quitting     bool
-	confirmExit  bool
-	completedMap map[int]bool
+	steps         []Step
+	currentStep   int
+	sidebarOffset int // steps antes del primer step visible en la sidebar
+	data          *SetupData
+	quitting      bool
+	confirmExit   bool
+	completedMap  map[int]bool
 }
 
 // NewWizardModel construye un WizardModel listo para usar.
+// Infiere configExists desde existingCfg y configErr.
 func NewWizardModel(cfgPath string, existingCfg *config.Config, configErr error) WizardModel {
+	configExists := existingCfg != nil || configErr != nil
+	return NewWizardModelWithExists(cfgPath, existingCfg, configErr, configExists)
+}
+
+// NewWizardModelWithExists construye un WizardModel con informacion explicita sobre
+// si el archivo de config existe en disco.
+func NewWizardModelWithExists(cfgPath string, existingCfg *config.Config, configErr error, configExists bool) WizardModel {
 	data := &SetupData{
-		ConfigPath:  cfgPath,
-		ExistingCfg: existingCfg,
-		ConfigErr:   configErr,
+		ConfigPath:   cfgPath,
+		ExistingCfg:  existingCfg,
+		ConfigErr:    configErr,
+		ConfigExists: configExists,
 	}
 
-	steps := []Step{
+	// Steps visibles en la sidebar (los 7 del wizard)
+	visibleSteps := []Step{
 		&WelcomeStep{},
 		&PlaceholderStep{name: "Bot Token"},
 		&PlaceholderStep{name: "Canal General"},
@@ -69,11 +81,26 @@ func NewWizardModel(cfgPath string, existingCfg *config.Config, configErr error)
 		&PlaceholderStep{name: "Resumen"},
 	}
 
+	// Si hay config (valido o invalido), insertar DetectConfigStep como step 0 (interno).
+	// Si no hay config, saltar directamente al wizard sin mostrar DetectConfigStep.
+	var steps []Step
+	sidebarOffset := 0
+
+	if configExists {
+		steps = append([]Step{&DetectConfigStep{}}, visibleSteps...)
+		sidebarOffset = 1
+	} else {
+		// No hay config: setear Mode="new" directamente
+		data.Mode = "new"
+		steps = visibleSteps
+	}
+
 	return WizardModel{
-		steps:        steps,
-		currentStep:  0,
-		data:         data,
-		completedMap: make(map[int]bool),
+		steps:         steps,
+		currentStep:   0,
+		sidebarOffset: sidebarOffset,
+		data:          data,
+		completedMap:  make(map[int]bool),
 	}
 }
 
@@ -146,15 +173,20 @@ func (m WizardModel) View() tea.View {
 }
 
 // renderSidebar genera la barra lateral con los steps y su estado.
-func renderSidebar(currentStep int, completedSteps map[int]bool) string {
+// sidebarStep es el indice del step activo dentro de stepNames (ya ajustado por offset).
+// completedSteps es el mapa de steps completados (indices en el slice de steps del model).
+// sidebarOffset es la cantidad de steps internos antes del primer step visible.
+func renderSidebar(sidebarStep int, completedSteps map[int]bool, sidebarOffset int) string {
 	var sb strings.Builder
 
 	for i, name := range stepNames {
+		// Convertir indice de sidebar a indice en steps slice
+		stepsIdx := i + sidebarOffset
 		var line string
-		if i == currentStep {
+		if i == sidebarStep {
 			// El step activo siempre se muestra como activo, incluso si fue completado antes
 			line = StepActive.Render("▸ " + name)
-		} else if completedSteps[i] {
+		} else if completedSteps[stepsIdx] {
 			line = StepDone.Render("✓ " + name)
 		} else {
 			line = StepPending.Render("  " + name)
@@ -164,7 +196,7 @@ func renderSidebar(currentStep int, completedSteps map[int]bool) string {
 	}
 
 	// Contador [N/7]
-	counter := fmt.Sprintf("[%d/7]", currentStep+1)
+	counter := fmt.Sprintf("[%d/7]", sidebarStep+1)
 	sb.WriteString(HintStyle.Render(counter))
 	sb.WriteString("\n")
 
@@ -173,7 +205,12 @@ func renderSidebar(currentStep int, completedSteps map[int]bool) string {
 
 // renderLayout compone el layout completo: sidebar + separador + contenido del step.
 func renderLayout(m WizardModel) string {
-	sidebar := renderSidebar(m.currentStep, m.completedMap)
+	// Calcular el indice de sidebar: currentStep menos los steps internos antes de la sidebar
+	sidebarStep := m.currentStep - m.sidebarOffset
+	if sidebarStep < 0 {
+		sidebarStep = 0
+	}
+	sidebar := renderSidebar(sidebarStep, m.completedMap, m.sidebarOffset)
 
 	// Contenido del step actual
 	stepContent := m.steps[m.currentStep].View(m.data)
@@ -229,9 +266,16 @@ func FormatNonInteractiveError() string {
 	return ErrorStyle.Render(msg)
 }
 
-// RunWizard lanza el wizard bubbletea con los parametros dados.
+// RunWizard lanza el wizard bubbletea. Infiere configExists desde existingCfg y configErr.
+// Mantener compatibilidad con tests existentes.
 func RunWizard(cfgPath string, existingCfg *config.Config, configErr error) error {
-	model := NewWizardModel(cfgPath, existingCfg, configErr)
+	return RunWizardWithExists(cfgPath, existingCfg, configErr, existingCfg != nil || configErr != nil)
+}
+
+// RunWizardWithExists lanza el wizard bubbletea con informacion explicita sobre
+// si el archivo de config existe en disco.
+func RunWizardWithExists(cfgPath string, existingCfg *config.Config, configErr error, configExists bool) error {
+	model := NewWizardModelWithExists(cfgPath, existingCfg, configErr, configExists)
 
 	var opts []tea.ProgramOption
 
