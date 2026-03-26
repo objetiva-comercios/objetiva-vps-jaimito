@@ -4,7 +4,9 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -16,6 +18,7 @@ type Config struct {
 	Channels    []ChannelConfig `yaml:"channels"`
 	Server      ServerConfig    `yaml:"server"`
 	SeedAPIKeys []SeedAPIKey    `yaml:"seed_api_keys"`
+	Metrics     *MetricsConfig  `yaml:"metrics,omitempty"`
 }
 
 // TelegramConfig holds Telegram bot credentials.
@@ -44,6 +47,107 @@ type ServerConfig struct {
 type SeedAPIKey struct {
 	Name string `yaml:"name"`
 	Key  string `yaml:"key"`
+}
+
+// MetricsConfig holds the optional metrics collection configuration.
+// If this section is absent from config.yaml, metrics are disabled entirely (D-04).
+type MetricsConfig struct {
+	Retention       string      `yaml:"retention"`
+	AlertCooldown   string      `yaml:"alert_cooldown"`
+	CollectInterval string      `yaml:"collect_interval"`
+	Definitions     []MetricDef `yaml:"definitions"`
+}
+
+// Thresholds defines warning and critical thresholds for a metric.
+// Both fields use pointers so that omitting them in YAML results in nil (no alerts).
+type Thresholds struct {
+	Warning  *float64 `yaml:"warning"`
+	Critical *float64 `yaml:"critical"`
+}
+
+// MetricDef describes a single metric to collect via a shell command.
+type MetricDef struct {
+	Name       string      `yaml:"name"`
+	Command    string      `yaml:"command"`
+	Interval   string      `yaml:"interval,omitempty"`   // inherits collect_interval if empty
+	Category   string      `yaml:"category,omitempty"`   // default "custom" applied at runtime
+	Type       string      `yaml:"type,omitempty"`       // default "gauge" applied at runtime
+	Thresholds *Thresholds `yaml:"thresholds,omitempty"` // nil = no alerts for this metric
+}
+
+// parseDuration converts duration strings like "7d", "300s", "5m" to time.Duration.
+// Go's time.ParseDuration does not support "d" (days), so this function handles it specially.
+func parseDuration(s string) (time.Duration, error) {
+	if s == "" {
+		return 0, fmt.Errorf("duration must not be empty")
+	}
+	if strings.HasSuffix(s, "d") {
+		days := strings.TrimSuffix(s, "d")
+		n, err := strconv.Atoi(days)
+		if err != nil || n <= 0 {
+			return 0, fmt.Errorf("invalid duration %q: days must be a positive integer", s)
+		}
+		return time.Duration(n) * 24 * time.Hour, nil
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return 0, fmt.Errorf("invalid duration %q: %w", s, err)
+	}
+	if d <= 0 {
+		return 0, fmt.Errorf("invalid duration %q: must be positive", s)
+	}
+	return d, nil
+}
+
+// ParseDuration is the exported wrapper around parseDuration for use by Phase 9+ packages.
+func ParseDuration(s string) (time.Duration, error) {
+	return parseDuration(s)
+}
+
+// validate checks the MetricsConfig fields for correctness.
+func (m *MetricsConfig) validate() error {
+	if _, err := parseDuration(m.Retention); err != nil {
+		return fmt.Errorf("metrics.retention: %w", err)
+	}
+	if _, err := parseDuration(m.AlertCooldown); err != nil {
+		return fmt.Errorf("metrics.alert_cooldown: %w", err)
+	}
+	collectInterval, err := parseDuration(m.CollectInterval)
+	if err != nil {
+		return fmt.Errorf("metrics.collect_interval: %w", err)
+	}
+
+	seen := make(map[string]bool)
+	for i, def := range m.Definitions {
+		if def.Name == "" {
+			return fmt.Errorf("metrics.definitions[%d]: name must not be empty", i)
+		}
+		if seen[def.Name] {
+			return fmt.Errorf("metrics.definitions[%d]: duplicate name %q", i, def.Name)
+		}
+		seen[def.Name] = true
+		if def.Command == "" {
+			return fmt.Errorf("metrics.definitions[%d] %q: command must not be empty", i, def.Name)
+		}
+		if def.Interval != "" {
+			d, err := parseDuration(def.Interval)
+			if err != nil {
+				return fmt.Errorf("metrics.definitions[%d] %q: interval: %w", i, def.Name, err)
+			}
+			if d <= 0 {
+				return fmt.Errorf("metrics.definitions[%d] %q: interval must be positive", i, def.Name)
+			}
+		} else {
+			// Definition inherits the global collect_interval; already validated above.
+			_ = collectInterval
+		}
+		if def.Thresholds != nil && def.Thresholds.Warning != nil && def.Thresholds.Critical != nil {
+			if *def.Thresholds.Warning >= *def.Thresholds.Critical {
+				return fmt.Errorf("metrics.definitions[%d] %q: thresholds.warning must be < critical", i, def.Name)
+			}
+		}
+	}
+	return nil
 }
 
 // validPriorities is the set of accepted priority values.
@@ -130,6 +234,12 @@ func (c *Config) Validate() error {
 		}
 		if !strings.HasPrefix(k.Key, "sk-") {
 			return fmt.Errorf("seed_api_keys: key for %q must start with \"sk-\"", k.Name)
+		}
+	}
+
+	if c.Metrics != nil {
+		if err := c.Metrics.validate(); err != nil {
+			return err
 		}
 	}
 
