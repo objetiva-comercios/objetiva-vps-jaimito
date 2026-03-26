@@ -38,7 +38,7 @@ func TestOpenAndApplySchema(t *testing.T) {
 	}
 	t.Logf("WAL mode: OK (journal_mode = %s)", journalMode)
 
-	tables := []string{"messages", "dispatch_log", "api_keys"}
+	tables := []string{"messages", "dispatch_log", "api_keys", "metrics", "metric_readings"}
 	for _, table := range tables {
 		var name string
 		err := db.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name=?", table).Scan(&name)
