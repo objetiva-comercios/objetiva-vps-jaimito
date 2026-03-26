@@ -6,6 +6,160 @@
 
 ---
 
+## v2.0 Additions: Métricas y Dashboard
+
+*Added 2026-03-26 — new dependencies for metrics collection, storage, and embedded web dashboard.*
+
+### Scope
+
+This section covers ONLY what changes for v2.0. The existing stack (v1.0 + v1.1) remains unchanged. No new Go framework dependencies — the dashboard is embedded static files served by the existing chi router.
+
+### New Go Dependencies
+
+| Technology | Version | Purpose | Why Recommended |
+|------------|---------|---------|-----------------|
+| `github.com/shirou/gopsutil/v4` | v4.26.2 (published Feb 27, 2026) | CPU, RAM, disk, load, host, Docker metrics | **CGO-free** (all C structs ported to pure Go). Verified `pkg.go.dev`. Provides `cpu.Percent()`, `mem.VirtualMemory()`, `disk.Usage()`, `load.Avg()`, `host.Uptime()`, `docker.GetDockerStat()` — covers all 5 predefined metrics. Alternative is raw shell command parsing, but gopsutil eliminates parsing brittle output formats and handles cross-architecture differences (amd64/arm64). v4 is the current module path; v3 still exists but v4 is the maintained line. |
+
+### Frontend Assets (Embedded via go:embed)
+
+No npm, no Node.js, no build step in CI. All assets are either pre-compiled by the developer before committing, or fetched from CDN at development time and bundled.
+
+| Asset | Version | Size (minified+gzip) | How to Embed | Why |
+|-------|---------|---------------------|--------------|-----|
+| Alpine.js | v3.14.x (latest v3) | ~7.1 KB gzipped | Download `cdn.min.js` → `web/static/js/alpine.min.js` | Lightweight reactive framework for the dashboard's table refresh and chart toggle. 7.1 KB gzipped is negligible in a binary. `x-data`, `x-show`, `@click`, `x-init` cover 100% of dashboard interactivity needs. No build toolchain required. |
+| uPlot | v1.6.32 (Mar 14, 2025) | ~47.9 KB min (~15 KB gzip est.) | Download `dist/uPlot.iife.min.js` + `dist/uPlot.min.css` → `web/static/` | Time-series chart library at 1/5 the size of Chart.js (47.9 KB min vs 254 KB min). uPlot renders 3,600 data points at 60fps using 10% CPU vs Chart.js at 40% CPU. Purpose-built for time-series: x-axis is always time, y-axis is value — exactly the metrics readings pattern. No React/Vue dependency. IIFE build works directly in a `<script>` tag. |
+| Tailwind CSS (pre-compiled) | v4.x (latest) | <10 KB (purged) | Run standalone CLI once to produce `web/static/css/tailwind.css` → commit compiled file | Tailwind v4 Play CDN is **development only** — not suitable for production (loads 1.2 MB of unused CSS). Standalone CLI (`tailwindcss-linux-x64`) produces purged CSS with only used classes. Typical dashboard output: <10 KB. No Node.js or npm needed on build/deploy machines — only the developer runs the CLI once. Commit `tailwind.css` to repo. |
+| Lucide icons (inline SVG) | Latest (copy specific SVGs) | <1 KB per icon | Copy individual `.svg` files from `lucide-static` package → inline directly in HTML templates | For a dashboard with 10-15 icons, the CDN approach adds a full HTTP dependency and potential offline failure. Copy only the needed SVG markup inline into the HTML template — no external request, no JS library, no CSS icon font loading. Lucide SVGs are clean `<svg>` elements that accept Tailwind `class` attributes directly. |
+
+### Build Integration: go:embed
+
+No new Go libraries needed for embedding. The standard library `embed` package (Go 1.16+) handles everything.
+
+**Recommended directory structure:**
+
+```
+internal/
+  web/
+    handler.go          # chi route registration for dashboard
+web/
+  static/
+    css/
+      tailwind.css      # pre-compiled by Tailwind standalone CLI
+    js/
+      alpine.min.js     # downloaded from CDN
+      uplot.iife.min.js # downloaded from CDN/GitHub releases
+      uplot.min.css     # downloaded from GitHub releases
+  templates/
+    dashboard.html      # single-page dashboard with inline Lucide SVGs
+```
+
+**Go embed declaration:**
+
+```go
+//go:embed web/static web/templates
+var webFS embed.FS
+```
+
+**Chi route registration (integrates with existing router):**
+
+```go
+// Inside existing chi router setup
+staticFS, _ := fs.Sub(webFS, "web/static")
+r.Handle("/dashboard/static/*", http.StripPrefix("/dashboard/static/", http.FileServer(http.FS(staticFS))))
+r.Get("/dashboard", dashboardHandler)
+r.Get("/dashboard/", dashboardHandler)
+```
+
+No auth required — dashboard serves on `127.0.0.1:8080`, Tailscale-only access per spec.
+
+### New SQLite Schema (via goose migration)
+
+No new Go libraries. Two new tables added via existing goose migration system:
+
+- `metric_definitions` — config-driven metric definitions (name, command, interval, thresholds)
+- `metric_readings` — time-series readings (metric_name, value, collected_at)
+- Index on `(metric_name, collected_at)` for efficient 7-day range queries
+- goose scheduled task or ticker in `main.go` handles purge (DELETE WHERE collected_at < NOW - 7 days)
+
+### New REST API Endpoints (chi integration)
+
+No new router dependency. Add to existing chi subrouter under `/api/v1/`:
+
+```
+GET  /api/v1/metrics                     — current reading per metric
+GET  /api/v1/metrics/{name}/readings     — time-series readings (last N hours)
+POST /api/v1/metrics/{name}              — manual ingestion (jaimito metric CLI)
+```
+
+Bearer auth middleware already applied to `/api/v1/*` group — metrics endpoints inherit it automatically.
+
+---
+
+### What NOT to Add
+
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| Prometheus client (`prometheus/client_golang`) | 15+ transitive deps, 2 MB binary size increase, requires Prometheus scraper to consume — overkill for a self-contained dashboard. The spec explicitly says "sin instalar Prometheus/Grafana". | Direct SQLite storage + custom REST API |
+| Chart.js | 254 KB minified vs uPlot's 47.9 KB. Built for general charts (pie, bar, radar) — the dashboard only needs time-series line charts. uPlot's API is lower-level but covers exactly this use case with 5x less code. | uPlot v1.6.32 |
+| React / Vue / Svelte SPA | Build toolchain (npm, bundler, HMR server) adds complexity for a single-page read-only dashboard. Alpine.js handles the reactive state (selected metric, chart visibility, auto-refresh interval) with ~20 lines of `x-data`. | Alpine.js v3 |
+| HTMX | HTMX is excellent for server-rendered interactivity, but the dashboard needs client-side chart rendering (uPlot draws on `<canvas>`) — HTMX cannot replace Alpine.js + uPlot for that. Adding both HTMX and Alpine.js is redundant. | Alpine.js for interactivity |
+| Tailwind CDN Play script | Dev-only. Loads the entire Tailwind engine (1.2 MB) in the browser. Not for production embedded binaries. | Standalone CLI pre-compiled CSS committed to repo |
+| Icon font CDN (Font Awesome, Lucide icon font) | External HTTP request at runtime; failure makes icons disappear; loads ALL icons (wasted KB). | Inline SVG from lucide-static |
+| `github.com/shirou/gopsutil/v3` | v4 is the current maintained module path. v3 still exists but v4 adds platform-specific Ex functions and has more recent bug fixes. | `github.com/shirou/gopsutil/v4` |
+| `github.com/docker/docker` SDK | 20 MB of transitive deps to get container stats. gopsutil v4 `docker` package covers `running containers count` via `/sys/fs/cgroup` — sufficient for the predefined `docker_running` metric. | `gopsutil/v4/docker` |
+
+---
+
+### Installation: v2.0 additions only
+
+```bash
+# New Go dependency
+go get github.com/shirou/gopsutil/v4@v4.26.2
+
+# Frontend: download and commit (run once, not in CI)
+# Tailwind standalone CLI (Linux amd64)
+curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-linux-x64
+chmod +x tailwindcss-linux-x64
+./tailwindcss-linux-x64 -i web/src/input.css -o web/static/css/tailwind.css --minify
+
+# Alpine.js
+curl -sL https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js -o web/static/js/alpine.min.js
+
+# uPlot (check https://github.com/leeoniya/uPlot/releases for latest tag)
+curl -sL https://github.com/leeoniya/uPlot/releases/download/1.6.32/uPlot-1.6.32.zip -o uplot.zip
+# Extract dist/uPlot.iife.min.js and dist/uPlot.min.css → web/static/js/ and web/static/css/
+
+# Verify
+go mod tidy
+```
+
+---
+
+### Version Compatibility: v2.0 additions
+
+| Package | Compatible With | Notes |
+|---------|-----------------|-------|
+| `gopsutil/v4@v4.26.2` | Go >= 1.18 | CGO_ENABLED=0 fully supported; pure Go; arm64 supported natively |
+| Alpine.js v3 | All evergreen browsers | No IE11 support (irrelevant for local VPS dashboard) |
+| uPlot v1.6.32 | All evergreen browsers | Uses Canvas API; works in all modern browsers; no polyfills needed |
+| Tailwind CSS v4 pre-compiled | Static file — no runtime dep | Commit compiled CSS; no browser compatibility issue beyond Tailwind's own browser support matrix |
+
+---
+
+### Sources (v2.0 section)
+
+- `pkg.go.dev/github.com/shirou/gopsutil/v4` — v4.26.2 published Feb 27, 2026; CGO-free confirmed in README (HIGH confidence)
+- `github.com/leeoniya/uPlot` — v1.6.32, ~47.9 KB minified, performance benchmarks (HIGH confidence, official repo)
+- `bundlephobia.com/package/alpinejs` — 7.1 KB gzipped confirmed (HIGH confidence)
+- `tailwindcss.com/blog/standalone-cli` — standalone CLI without Node.js, official Tailwind announcement (HIGH confidence)
+- `github.com/tailwindlabs/tailwindcss/discussions/15855` — v4 standalone CLI discussion, <10KB purged output (MEDIUM confidence, community-verified)
+- `lucide.dev/guide/packages/lucide-static` — static SVG assets package for offline embedding (HIGH confidence, official docs)
+- WebSearch: uPlot vs Chart.js bundle size comparison — 254 KB Chart.js vs 47.9 KB uPlot confirmed by multiple sources (HIGH confidence)
+- WebSearch: Alpine.js vs React for lightweight dashboards (MEDIUM confidence, multiple community sources agree)
+- `pkg.go.dev/embed` + `eli.thegreenplace.net` — go:embed with chi `http.FileServer(http.FS(...))` pattern (HIGH confidence)
+
+---
+
 ## v1.1 Additions: TUI Setup Wizard
 
 *Added 2026-03-23 — new dependencies for `jaimito setup` command only.*
@@ -84,7 +238,6 @@ Do NOT mix v1 and v2 — types are incompatible. bubbles v2 uses `tea.KeyPressMs
 - `pkg.go.dev/charm.land/bubbles/v2/textinput` — v2 textinput API — HIGH confidence
 - `pkg.go.dev/charm.land/bubbles/v2/spinner` — v2 spinner API — HIGH confidence
 - `pkg.go.dev/charm.land/lipgloss/v2` — `Style.Render()` returns `string` confirmed — HIGH confidence
-- `pkg.go.dev/golang.org/x/term` — `IsTerminal()` API — HIGH confidence
 - `github.com/charmbracelet/bubbletea/discussions/1374` — v2 rationale, new-project recommendation — MEDIUM confidence
 - `github.com/charmbracelet/bubbles/blob/main/UPGRADE_GUIDE_V2.md` — breaking changes v1→v2 — HIGH confidence
 
@@ -117,7 +270,7 @@ Do NOT mix v1 and v2 — types are incompatible. bubbles v2 uses `tea.KeyPressMs
 |------|---------|-------|
 | `golangci-lint` | v2.10.1 (published 2026-02-17) | Static analysis and linting | v2 config format uses `linters.default` (replaces enable-all/disable-all). Run in CI. Key linters: `errcheck`, `staticcheck`, `govet`, `revive`. Use `golangci-lint migrate` to generate v2 config from scratch. |
 | `log/slog` (stdlib) | Go 1.21+ built-in | Structured logging | Use `slog.JSONHandler` in production (systemd captures stdout; JSON parses in Loki/Grafana). `slog.TextHandler` for dev. Zero external dependency. Goose v3.26 also integrates with slog via `WithSlog`. |
-| `embed` (stdlib) | Go 1.16+ built-in | Embed SQL migration files | Embed `migrations/*.sql` into the binary with `//go:embed migrations/*.sql`. Eliminates runtime file path issues. No third-party tool needed. |
+| `embed` (stdlib) | Go 1.16+ built-in | Embed SQL migration files + dashboard assets | Embed `migrations/*.sql` and `web/` directory into the binary with `//go:embed`. Eliminates runtime file path issues. No third-party tool needed. |
 | GoReleaser | v2.x (latest, check goreleaser.com) | Release binary builds | Produces `linux/amd64` and `linux/arm64` binaries, `.deb`/`.rpm` packages, and systemd unit in a single config. With `CGO_ENABLED=0` (modernc sqlite), no Docker cross-compile complexity needed. |
 
 ---
@@ -146,6 +299,9 @@ go get charm.land/bubbles/v2@v2.0.0
 go get charm.land/lipgloss/v2@v2.0.2
 go get golang.org/x/term@v0.41.0
 
+# v2.0: Metrics and dashboard
+go get github.com/shirou/gopsutil/v4@v4.26.2
+
 # Verify
 go mod tidy
 ```
@@ -165,6 +321,9 @@ go mod tidy
 | `pressly/goose/v3` | `golang-migrate` | golang-migrate does not wrap individual statements in transactions—a partial migration leaves the database inconsistent. Goose wraps each migration file in a transaction. For an embedded use case (no separate CLI needed), goose is more ergonomic. |
 | `log/slog` (stdlib) | `uber-go/zap` or `rs/zerolog` | Only if benchmarks show slog overhead is a problem, which at jaimito's scale (<50MB target, low notification volume) it will not be. Avoid external logging dependencies when stdlib suffices. |
 | `charm.land/bubbletea/v2` | `github.com/charmbracelet/huh` | huh provides a higher-level form abstraction that works well for linear wizards. Avoid here because the spec requires non-linear navigation (jump-to-step from summary). Raw bubbletea gives full control. |
+| uPlot (v2.0 dashboard) | Chart.js | Chart.js is better if you need pie charts, radar charts, stacked bar charts. For time-series only, uPlot is 5x smaller and 4x lower CPU. |
+| Alpine.js (v2.0 dashboard) | React/Vue/Svelte | Use a SPA framework only if the dashboard requires complex client-side routing or deeply nested component trees. A single-page metrics dashboard doesn't warrant the build complexity. |
+| Pre-compiled Tailwind CSS (v2.0) | Tailwind CDN Play script | Use Play CDN only in development/prototyping. Never in production embedded binaries. |
 
 ---
 
@@ -181,6 +340,11 @@ go mod tidy
 | `gorilla/mux` | Unmaintained (archived). chi superseded it as the community standard. | `go-chi/chi/v5` |
 | External message queue (Redis, RabbitMQ) | Violates the zero-external-dependencies constraint. SQLite WAL mode handles the queue durably at jaimito's scale. | SQLite `messages` table as the queue |
 | `github.com/charmbracelet/bubbletea` (v1 path) | Maintenance-only since Sep 2024; type-incompatible with bubbles v2 and lipgloss v2 | `charm.land/bubbletea/v2` |
+| `prometheus/client_golang` | 15+ transitive deps, ~2 MB binary increase, requires external Prometheus scraper. Contradicts "no Prometheus/Grafana" spec constraint. | Direct SQLite storage + custom `/api/v1/metrics` endpoint |
+| Chart.js | 254 KB minified (vs uPlot 47.9 KB). General-purpose library overkill for time-series-only dashboard. | uPlot v1.6.32 |
+| Tailwind CDN Play script in production | Dev-only. Ships 1.2 MB of unused CSS. Requires browser JS engine to compile CSS at runtime. | Tailwind standalone CLI pre-compiled CSS |
+| `github.com/docker/docker` SDK | ~20 MB of transitive dependencies for container stats. gopsutil/v4's docker package covers the `docker_running` metric via cgroups. | `gopsutil/v4/docker` |
+| `github.com/shirou/gopsutil/v3` | v3 is superseded. v4 is the current module path with ongoing maintenance (v4.26.2 Feb 2026). | `github.com/shirou/gopsutil/v4` |
 
 ---
 
@@ -189,11 +353,13 @@ go mod tidy
 **If running on arm64 VPS (e.g., Ampere, AWS Graviton):**
 - Use `GOARCH=arm64 GOOS=linux CGO_ENABLED=0 go build`
 - modernc.org/sqlite supports arm64 natively (pure Go)
+- gopsutil/v4 supports arm64 natively (pure Go)
 - No additional toolchain changes needed
 
-**If adding a web dashboard in v2:**
-- Use `go:embed` to bundle a React/Vue SPA into the binary
-- Chi already handles serving `http.FileServer` from an embedded FS
+**If adding a web dashboard in v2 (now active):**
+- Use `go:embed` to bundle `web/` directory into the binary
+- Chi already handles serving `http.FileServer(http.FS(...))` from an embedded FS
+- Pre-compile Tailwind CSS once with standalone CLI, commit to repo
 - Do NOT add a separate static file server dependency
 
 **If Telegram rate limits become a problem:**
@@ -208,6 +374,11 @@ go mod tidy
 **If wizard needs to run in a non-standard terminal (e.g., tmux, screen):**
 - bubbletea v2 handles terminal detection via `TERM` environment; no special handling needed
 - `/dev/tty` redirect in install.sh handles the curl | bash case at the shell level
+
+**If metrics collector needs to run custom shell commands (v2.0):**
+- Use `os/exec` stdlib — no external library. `exec.CommandContext(ctx, "sh", "-c", command)` with a timeout context
+- gopsutil handles the 5 predefined metrics (disk, RAM, CPU, Docker, uptime)
+- Custom user-defined metrics in config.yaml use raw shell commands via exec
 
 ---
 
@@ -226,6 +397,7 @@ go mod tidy
 | `charm.land/bubbles/v2@v2.0.0` | bubbletea v2 only | Type-incompatible with bubbletea v1 |
 | `charm.land/lipgloss/v2@v2.0.2` | bubbletea v1 or v2 | Styling only; `Render()` returns string; no bubbletea type dependency |
 | `golang.org/x/term@v0.41.0` | All Go versions | Uses `golang.org/x/sys` internally; already transitive dep in go.mod |
+| `gopsutil/v4@v4.26.2` | Go >= 1.18 | CGO_ENABLED=0; arm64 + amd64 supported; Linux only for docker package |
 
 ---
 
@@ -250,8 +422,13 @@ go mod tidy
 - `github.com/charmbracelet/bubbles/blob/main/UPGRADE_GUIDE_V2.md` — v1→v2 breaking changes (HIGH confidence)
 - `alexedwards.net/blog/which-go-router-should-i-use` — chi vs stdlib analysis 2025 (MEDIUM confidence, respected Go author)
 - `sqlite.org/wal.html` — WAL mode concurrency characteristics (HIGH confidence, official SQLite docs)
+- `pkg.go.dev/github.com/shirou/gopsutil/v4` — v4.26.2 published Feb 27, 2026; CGO-free confirmed (HIGH confidence)
+- `github.com/leeoniya/uPlot` — v1.6.32, ~47.9 KB minified, benchmark data (HIGH confidence, official repo)
+- `bundlephobia.com/package/alpinejs` — 7.1 KB gzipped (HIGH confidence)
+- `tailwindcss.com/blog/standalone-cli` — standalone CLI official announcement (HIGH confidence)
+- `lucide.dev/guide/packages/lucide-static` — static SVG assets, offline embedding (HIGH confidence, official docs)
 
 ---
 
 *Stack research for: jaimito — VPS push notification hub in Go*
-*Researched: 2026-02-20 (v1.0 base stack) | Updated: 2026-03-23 (v1.1 TUI additions)*
+*Researched: 2026-02-20 (v1.0 base stack) | Updated: 2026-03-23 (v1.1 TUI additions) | Updated: 2026-03-26 (v2.0 metrics + dashboard)*

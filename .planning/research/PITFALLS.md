@@ -1,14 +1,549 @@
 # Pitfalls Research
 
 **Domain:** Self-hosted VPS notification hub (Go + SQLite + Telegram Bot API + CLI)
-**Researched:** 2026-02-20 (v1.0 MVP) | Updated: 2026-03-23 (v1.1 Setup Wizard)
-**Confidence:** HIGH (SQLite/Go findings HIGH via multiple verified sources; Telegram API findings MEDIUM via official docs + community; bubbletea TUI pitfalls HIGH for stdin/permissions, MEDIUM for async patterns)
+**Researched:** 2026-02-20 (v1.0 MVP) | Updated: 2026-03-23 (v1.1 Setup Wizard) | Updated: 2026-03-26 (v2.0 Métricas y Dashboard)
+**Confidence:** HIGH (SQLite/Go findings HIGH via multiple verified sources; Telegram API findings MEDIUM via official docs + community; bubbletea TUI pitfalls HIGH for stdin/permissions, MEDIUM for async patterns; v2.0 metrics pitfalls HIGH for os/exec/SQLite contention/go:embed, MEDIUM for alerting patterns)
+
+---
+
+## v2.0 Métricas y Dashboard Pitfalls
+
+These pitfalls are specific to adding system metrics collection, threshold alerting, and an embedded web dashboard to the existing jaimito binary. They are the primary concern for the current milestone.
+
+---
+
+### Pitfall M1: os/exec with Shell (`sh -c`) Enables Command Injection from config.yaml
+
+**What goes wrong:**
+Metrics are defined in `config.yaml` as shell commands — e.g., `command: "df -h / | awk '{print $5}'"`. If the collector runs these via `exec.Command("sh", "-c", command)`, any YAML value that contains shell metacharacters (`;`, `&&`, `$(`, backticks) executes arbitrary shell code as the jaimito process user (root on most VPS deployments). An attacker who gains write access to `/etc/jaimito/config.yaml` achieves RCE.
+
+**Why it happens:**
+Developers reach for `sh -c` to support shell pipelines in metric commands (essential for `df | awk`-style extraction). The convenience of shell features makes the risk invisible until the config file is seen as an attack surface.
+
+**How to avoid:**
+Use `sh -c` intentionally but treat the config file as a security boundary:
+- Enforce `0600` on `config.yaml` at startup (already done for v1.0). If the file is world-readable, refuse to start.
+- Never interpolate user-supplied runtime data (e.g., metric names from API) into shell command strings.
+- For the built-in predefined metrics (`disk_root`, `ram_used`, etc.), hardcode the commands in Go — do not read them from config. Only user-defined metrics come from config.
+- Document in config schema that `command` values are executed as shell; advise VPS operators to treat the config file like a crontab.
+
+**Warning signs:**
+- `config.yaml` has permissions 0644 or 0664
+- Metric command contains `$(...)` or backticks
+- Config file is writable by the service user (jaimito) — the service should not be able to modify its own config
+
+**Phase to address:** Phase 1 (metric collector scaffold) — enforce config file permission check on startup before any command is ever executed.
+
+---
+
+### Pitfall M2: os/exec Timeout Not Applied — Metric Collection Hangs the Collector Goroutine
+
+**What goes wrong:**
+A metric command like `docker stats --no-stream` or a custom `curl`-based check hangs due to network issues or a zombie Docker daemon. Without a context timeout, the `cmd.Run()` call blocks indefinitely. The ticker-based collector goroutine stalls. No metrics are collected for that metric, and if the collector runs commands sequentially, all subsequent metrics also stop. Over time, goroutines accumulate because each tick spawns a new `exec.Command` that also blocks.
+
+**Why it happens:**
+`exec.Command("sh", "-c", cmd)` with no context has no built-in timeout. `exec.CommandContext` is the correct form but developers forget to set it, especially since the command works fine locally. Docker commands in particular can block for 30+ seconds when the Docker daemon is unresponsive.
+
+**How to avoid:**
+Always use `exec.CommandContext` with a timeout capped well below the metric's collection interval:
+
+```go
+// Timeout = 80% of interval, max 30s
+timeout := min(time.Duration(float64(interval)*0.8), 30*time.Second)
+ctx, cancel := context.WithTimeout(parentCtx, timeout)
+defer cancel()
+cmd := exec.CommandContext(ctx, "sh", "-c", command)
+out, err := cmd.Output()
+```
+
+Additionally, set `cmd.WaitDelay` (Go 1.20+) to bound the time waiting for pipe goroutines after the context deadline:
+
+```go
+cmd.WaitDelay = 5 * time.Second
+```
+
+**Warning signs:**
+- `ps aux | grep sh` shows accumulating zombie shell processes
+- Metric collection stops for one metric and never resumes
+- Memory usage grows slowly over days without apparent cause
+- `runtime.NumGoroutine()` increases monotonically
+
+**Phase to address:** Phase 1 (metric collector) — every `exec.CommandContext` call must include a timeout. Verify with a `sleep 60` test command.
+
+---
+
+### Pitfall M3: Child Process Spawns Sub-children — Context Cancel Kills Parent but Not Children
+
+**What goes wrong:**
+A metric command like `docker ps --format ...` spawns sh which spawns docker. When the context deadline fires, Go's `exec.CommandContext` sends SIGKILL to the direct child (sh), but sh's child (docker) may still be running if it has already detached from sh's process group. The docker process runs until its own timeout. With a metric that runs every 30 seconds, dozens of orphaned docker processes accumulate.
+
+**Why it happens:**
+`exec.CommandContext` calls `cmd.Process.Kill()` on the direct process only. On Linux, child processes of the shell are in a separate process group unless you explicitly set `cmd.SysProcAttr` to create a new process group and send the kill signal to the entire group.
+
+**How to avoid:**
+Set a process group and kill the whole group on timeout:
+
+```go
+cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+// On timeout, kill entire group:
+if ctx.Err() != nil {
+    syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+}
+```
+
+For most predefined metrics (`df`, `free`, `uptime`), this is not a concern — they are single-process. Only commands that invoke multi-process chains (docker, systemctl) need this protection.
+
+**Warning signs:**
+- `ps aux --forest` shows orphaned docker/systemctl children owned by jaimito
+- System load increases over days despite low notification/metric volume
+- `docker stats` processes visible in process list long after their collection window
+
+**Phase to address:** Phase 1 (metric collector) — implement process group kill for the Docker metric family. Test by interrupting a `docker stats --no-stream` mid-execution.
+
+---
+
+### Pitfall M4: Metric Writes Block Message Delivery — SQLite Single Writer Pool Conflict
+
+**What goes wrong:**
+jaimito's existing SQLite pool is configured as `SetMaxOpenConns(1)` — a single writer that serialises all operations. The v1.0 dispatcher and API ingestor were the only writers; their write patterns are short and fast. Adding a metric collector that writes every 30 seconds per metric (5 predefined + N user metrics) creates a write burst at each interval. If a collection interval fires while the dispatcher is in a slow Telegram API call with a pending status update, the dispatcher's write (`UPDATE messages SET status='dispatching'`) queues behind the metric inserts. Notification delivery latency increases.
+
+**Why it happens:**
+The `busy_timeout=5000` setting allows the write to wait up to 5 seconds, but the metrics write burst (10+ INSERTs in rapid succession) combined with the dispatcher's own transaction can cause queuing delays visible to the user as notification lag.
+
+**How to avoid:**
+Keep metric INSERTs small and fast — never hold a transaction open during command execution. The pattern must be:
+
+1. Execute shell command (outside any transaction)
+2. Record the result
+3. Open transaction, INSERT reading, COMMIT immediately
+
+Never do: open transaction → run shell command → INSERT → commit. The shell command could take seconds, holding the write lock throughout.
+
+Additionally, batch metric INSERTs at the end of a collection round rather than one transaction per metric:
+
+```go
+// Collect all readings first
+readings := collectAll(metrics)
+// Then write in one transaction
+tx.Begin()
+for _, r := range readings {
+    tx.Insert(r)
+}
+tx.Commit()
+```
+
+**Warning signs:**
+- Notification delivery latency increases from <1s to 2-5s after metrics are added
+- SQLite `busy_timeout` log warnings appearing in metric write paths
+- `PRAGMA wal_checkpoint` takes longer than usual after metric collection intervals
+
+**Phase to address:** Phase 1 (metric collector) AND Phase 2 (schema + storage) — enforce the collect-then-write pattern from the first implementation.
+
+---
+
+### Pitfall M5: go:embed Path Resolution — Files Must Be in or Below the Package Directory
+
+**What goes wrong:**
+The dashboard frontend files (HTML, JS, CSS) are intended to live at `web/dashboard/`. If the `//go:embed` directive is placed in a package that is not in the same directory or a parent of `web/`, the build fails with `pattern web/dashboard: no matching files found`. Developers try `//go:embed ../../web/dashboard` expecting relative paths to work — they don't. go:embed only allows paths relative to the file containing the directive, and only within the module.
+
+**Why it happens:**
+The natural desire is to put the embed directive in an `internal/dashboard` package alongside the HTTP handler, but that package may be at `internal/dashboard/handler.go` while assets are at `web/dashboard/`. The Go toolchain does not follow `..` traversal in embed patterns.
+
+**How to avoid:**
+Place a dedicated `embed.go` file in the same package at the root level, or restructure so the `web/` directory is a child of the package containing the directive. The cleanest pattern for jaimito:
+
+```go
+// In package main (cmd/jaimito/main.go or a sibling assets.go):
+//go:embed web/dashboard
+var DashboardFS embed.FS
+```
+
+Then pass `DashboardFS` down to the dashboard handler. Alternatively, create `internal/assets/assets.go` and place `web/` inside `internal/assets/web/`.
+
+**Warning signs:**
+- `go build` fails with "pattern X: no matching files found"
+- Embed works locally but fails in CI where paths differ
+- Developer uses `os.DirFS` in development and embed.FS in production — path mismatch causes 404s
+
+**Phase to address:** Phase 3 (dashboard scaffold) — establish the embed file structure before writing a single line of HTML.
+
+---
+
+### Pitfall M6: go:embed Silently Excludes Files Starting with `.` or `_`
+
+**What goes wrong:**
+Tailwind pre-compiled output may be named `.output.css` or placed in `_dist/`. go:embed's glob patterns silently exclude files and directories whose names start with `.` or `_`. The build succeeds, the binary is built, the server starts — but requests for the CSS file return 404. The developer debugs HTTP routing for hours before discovering the file was never embedded.
+
+**Why it happens:**
+This is documented behavior in the `embed` package, but easy to miss. The exclusion applies to both direct file patterns and directory patterns.
+
+**How to avoid:**
+- Name all embedded assets without leading `.` or `_`: use `tailwind.css`, `dist/`, `assets/` — never `_dist/` or `.build/`.
+- Verify embedded contents at build time: `go list -json -mod=mod ./... | jq '.[].EmbedFiles'` lists what is actually embedded.
+- Add a build-time test that opens the embedded FS and asserts the critical files exist:
+
+```go
+func TestEmbeddedAssets(t *testing.T) {
+    _, err := dashboardFS.Open("web/dashboard/index.html")
+    require.NoError(t, err)
+    _, err = dashboardFS.Open("web/dashboard/tailwind.css")
+    require.NoError(t, err)
+}
+```
+
+**Warning signs:**
+- CSS/JS files return 404 in production binary but work in `go run` dev mode
+- File sizes show 0 bytes for assets that should exist
+- `http.FileServer(http.FS(...))` returns "file not found" for known-good paths
+
+**Phase to address:** Phase 3 (dashboard scaffold) — add the embedded assets test before building any dashboard UI.
+
+---
+
+### Pitfall M7: Dashboard SPA Routing Breaks — chi FileServer Returns 404 for Non-Root Paths
+
+**What goes wrong:**
+The dashboard is served as a single-page app from an embedded FS. Direct navigation to `/dashboard/metrics/disk_root` (a client-side route) causes chi's `http.FileServer` to look for a file named `metrics/disk_root` in the embedded FS. It doesn't exist. The server returns 404 instead of serving `index.html` and letting the client-side router handle it.
+
+**Why it happens:**
+`http.FileServer` is a file server, not an SPA server. It serves files that exist; unknown paths return 404. SPA routing requires the server to return `index.html` for any path that doesn't match a known static file.
+
+**How to avoid:**
+Implement a custom SPA handler that checks if the requested file exists in the embedded FS, and falls back to `index.html` if it doesn't:
+
+```go
+func spaHandler(fs embed.FS, rootDir string) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        path := strings.TrimPrefix(r.URL.Path, "/")
+        f, err := fs.Open(filepath.Join(rootDir, path))
+        if err != nil {
+            // File not found — serve index.html for SPA routing
+            indexPath := filepath.Join(rootDir, "index.html")
+            http.ServeFileFS(w, r, fs, indexPath)
+            return
+        }
+        f.Close()
+        http.ServeFileFS(w, r, fs, filepath.Join(rootDir, path))
+    }
+}
+```
+
+Note: For jaimito's dashboard, if all navigation is handled by Alpine.js without changing the URL path (hash-based routing or single-page with no routing), this pitfall does not apply. Design the dashboard to avoid URL-based SPA routing if possible.
+
+**Warning signs:**
+- Direct URL navigation to any dashboard subpath returns 404
+- Browser back/forward buttons break after any navigation
+- Refreshing the page on any non-root URL returns 404
+
+**Phase to address:** Phase 3 (dashboard scaffold) — decide on routing strategy (hash vs path) before building navigation.
+
+---
+
+### Pitfall M8: Tailwind Play CDN Cannot Be Embedded — It Requires Network at Runtime
+
+**What goes wrong:**
+The Tailwind Play CDN (`<script src="https://cdn.tailwindcss.com">`) compiles CSS in the browser at runtime by scanning the DOM for class names. This requires a live network connection to Tailwind's CDN. On a VPS that is offline or behind a strict firewall, the dashboard renders unstyled. Additionally, the Play CDN bundle is ~300KB and generates styles on every page load — defeating the purpose of embedding assets into the binary for offline capability.
+
+**Why it happens:**
+Play CDN is marketed as the zero-setup way to use Tailwind, and it works perfectly in development. Developers embed the HTML with the CDN script tag and embed all other JS/CSS files, not realising Tailwind is the one dependency that cannot be embedded this way.
+
+**How to avoid:**
+Pre-compile Tailwind CSS using the Tailwind CLI standalone binary as a build step before `go build`:
+
+```bash
+# In Makefile or build script:
+tailwindcss -i web/dashboard/src/input.css -o web/dashboard/tailwind.css --minify
+go build ./...
+```
+
+The output `tailwind.css` is a static file that can be embedded with `//go:embed`. The compiled CSS for jaimito's dashboard will be 5-15KB, not 300KB. The Tailwind CLI standalone binary does not require Node.js.
+
+Alternatively, write the dashboard CSS without Tailwind and use a minimal hand-written CSS file — for a simple metrics table and chart, ~2KB of custom CSS is sufficient.
+
+**Warning signs:**
+- Dashboard renders as unstyled HTML when tested with network disabled
+- CSS file in embedded FS is empty or missing
+- Build logs show no Tailwind compilation step
+
+**Phase to address:** Phase 3 (dashboard scaffold) — establish the Tailwind build step in the Makefile before writing any dashboard HTML. Never use Play CDN in the final implementation.
+
+---
+
+### Pitfall M9: Alert Storm — Threshold Crossed on Every Collection Fires Unlimited Notifications
+
+**What goes wrong:**
+Disk usage is at 91% (threshold: 90%). The collector runs every 60 seconds. Every collection reads 91% and fires a Telegram alert. The user receives 1 alert per minute indefinitely until disk drops below 90%. At 60 alerts/hour, this is notification fatigue at best; at worst, it triggers jaimito's own Telegram rate limiting (Pitfall 3) and real notifications (from `jaimito wrap`) are blocked.
+
+**Why it happens:**
+Naive threshold implementation: `if value > threshold { sendAlert() }`. Every collection where the condition is true fires a new alert.
+
+**How to avoid:**
+Implement alert state tracking with cooldown in SQLite:
+
+1. Store alert state per metric: `alert_state` table with columns `(metric_name, level, fired_at, resolved_at)`.
+2. Only fire an alert when transitioning from `ok` to `warning` or `warning` to `critical` — not on every collection.
+3. Implement a cooldown: once an alert fires, suppress re-alerts for the same metric at the same level for at least `cooldown_minutes` (configurable, default 60 minutes).
+4. Fire a resolution notification when the metric returns below threshold.
+
+```
+State transitions that trigger notifications:
+  ok → warning     : fire warning alert
+  ok → critical    : fire critical alert
+  warning → critical : fire escalation alert
+  critical → ok    : fire resolution alert
+  warning → ok     : fire resolution alert
+  Same level (repeated): suppressed
+```
+
+**Warning signs:**
+- Multiple identical alert notifications in Telegram within minutes
+- Telegram showing "too many requests" errors after a metric crosses threshold
+- `SELECT COUNT(*) FROM messages WHERE channel='alerts' AND created_at > datetime('now', '-1 hour')` returns >5
+
+**Phase to address:** Phase 4 (threshold alerting) — implement state machine from the first alert, not as a patch after storms occur.
+
+---
+
+### Pitfall M10: Alert Flapping — Metric Oscillating Around Threshold Causes Rapid On/Off Alerts
+
+**What goes wrong:**
+CPU load averages 89.5-90.5% due to normal variation. Every other collection crosses the 90% threshold. The state machine correctly fires an alert (89→91), then a resolution (91→89), then another alert (89→91), cycling every few minutes. The user receives alternating "alert" and "resolved" notifications continuously.
+
+**Why it happens:**
+A single threshold with no hysteresis has no tolerance for natural variance. The alert state transitions correctly by the state machine logic, but the frequency is intolerable.
+
+**How to avoid:**
+Implement hysteresis with separate alert and recovery thresholds:
+
+```yaml
+metrics:
+  - name: cpu_load
+    threshold:
+      warning: 90
+      warning_recovery: 85   # Must drop to 85% before alert clears
+      critical: 95
+      critical_recovery: 90
+```
+
+Alert fires at 90%, but only clears when value drops to 85%. This creates a 5% deadband that absorbs natural oscillation.
+
+Additionally, require N consecutive threshold crossings before firing (e.g., `alert_for: 3` means value must be above threshold for 3 consecutive collections before alerting). This absorbs single-point spikes.
+
+**Warning signs:**
+- User reports receiving alternating alert/resolved notifications in pairs
+- Alert fired timestamp and resolved timestamp are less than 2 collection intervals apart
+- `SELECT * FROM alert_state WHERE metric_name='cpu_load' ORDER BY fired_at DESC LIMIT 10` shows alternating fired/resolved rows
+
+**Phase to address:** Phase 4 (threshold alerting) — implement recovery thresholds and `alert_for` count in the alerting design, not as a retrospective fix.
+
+---
+
+### Pitfall M11: Metric Collector Goroutine Leaks When Context Is Cancelled During Command Execution
+
+**What goes wrong:**
+jaimito receives SIGTERM (systemd stop). The main context is cancelled. The metric collector's ticker loop checks `ctx.Done()` and exits cleanly — but only if no command is currently executing. If a collection was mid-flight (e.g., `docker stats` running), the goroutine is blocked in `cmd.Wait()` and does not check `ctx.Done()`. Shutdown blocks until the command completes or times out. If `WaitDelay` was not set, it blocks forever.
+
+**Why it happens:**
+`os/exec`'s `CommandContext` sends a kill signal when the context is cancelled, but if the kill signal doesn't terminate the process (e.g., it's caught), `cmd.Wait()` still blocks. The goroutine running `cmd.Wait()` does not select on `ctx.Done()` — it's a blocking call.
+
+**How to avoid:**
+Set `cmd.WaitDelay` on every `exec.CommandContext` call. `WaitDelay` bounds the time `cmd.Wait()` will wait for pipe-copying goroutines after the context is cancelled:
+
+```go
+cmd := exec.CommandContext(ctx, "sh", "-c", command)
+cmd.WaitDelay = 3 * time.Second  // Force-close pipes 3s after context cancellation
+out, err := cmd.Output()
+```
+
+The metric collector's main loop must use `select` with both ticker and `ctx.Done()`:
+
+```go
+ticker := time.NewTicker(interval)
+defer ticker.Stop()
+for {
+    select {
+    case <-ctx.Done():
+        return
+    case <-ticker.C:
+        go collectMetric(ctx, metric)  // context propagated; collector respects cancellation
+    }
+}
+```
+
+**Warning signs:**
+- `systemctl stop jaimito` takes >5 seconds to complete
+- `journalctl -u jaimito` shows "Timeout: killing process" from systemd
+- Process still visible in `ps aux` after `systemctl stop`
+
+**Phase to address:** Phase 1 (metric collector) — implement shutdown gracefully from the first goroutine. Test with `systemctl stop` in the phase acceptance criteria.
+
+---
+
+### Pitfall M12: Metric Retention Purge Deletes Too Aggressively — Misses Timezone Edge Cases
+
+**What goes wrong:**
+The 7-day purge query uses `datetime('now', '-7 days')` in SQLite. SQLite's `now` returns UTC. If the VPS is configured with a local timezone (e.g., UTC-5), the purge may delete readings that are only 6.x days old in local time. More critically, if the purge runs at startup and the VPS clock was wrong at insert time, readings may have `collected_at` values in the future or far past — purge never removes them (future) or removes them immediately (clock skew).
+
+**Why it happens:**
+SQLite `datetime('now')` is always UTC. If timestamps are stored as local time strings (e.g., Go's `time.Now().String()` without UTC conversion), the comparison is between UTC now and local-time strings — the subtraction is wrong.
+
+**How to avoid:**
+Store all `collected_at` timestamps as UTC using `time.Now().UTC()` and insert as RFC3339 strings or Unix timestamps. Use `strftime('%s', 'now')` (Unix epoch) for reliable timezone-independent comparisons:
+
+```sql
+DELETE FROM metric_readings WHERE collected_at < strftime('%s', 'now') - (7 * 86400);
+```
+
+Or, if using RFC3339 strings, always use `datetime('now')` (UTC) for comparisons and ensure all inserts use `time.Now().UTC().Format(time.RFC3339)`.
+
+**Warning signs:**
+- Metric readings disappearing earlier than 7 days (clock skew or timezone mismatch)
+- Old readings never purged despite being weeks old (future-dated inserts from clock skew)
+- `SELECT MIN(collected_at), MAX(collected_at) FROM metric_readings` returns unexpected range
+
+**Phase to address:** Phase 2 (schema + storage) — establish UTC-only convention in schema design and enforce in all inserts.
+
+---
+
+### Pitfall M13: Dashboard Served Without Content-Type Headers — Browser Refuses to Execute JS/CSS
+
+**What goes wrong:**
+`http.FileServer(http.FS(embeddedFS))` sets content-type headers automatically based on file extension. However, if the embedded FS is served with a custom handler that calls `w.Write(content)` without setting `Content-Type`, or if the MIME type is not registered for `.css`/`.js`, the browser receives `Content-Type: application/octet-stream`. Chrome and Firefox refuse to apply stylesheets or execute scripts with the wrong content type. The dashboard loads as an unstyled page with no JavaScript.
+
+**Why it happens:**
+Developers writing a custom static file handler forget that `http.ServeContent` or `http.ServeFileFS` auto-detects MIME types, but `w.Write()` alone does not. The `net/http` package's MIME detection relies on `mime.TypeByExtension` which uses the OS's MIME database — on minimal VPS Linux images, `.js` may not be registered.
+
+**How to avoid:**
+Use `http.FileServer(http.FS(...))` or `http.ServeFileFS` for all static assets — these handle content-type automatically. If writing a custom handler, set content-type explicitly:
+
+```go
+ext := filepath.Ext(r.URL.Path)
+ct := mime.TypeByExtension(ext)
+if ct == "" {
+    // Fallback for minimal OS MIME databases
+    switch ext {
+    case ".js":   ct = "application/javascript"
+    case ".css":  ct = "text/css; charset=utf-8"
+    case ".html": ct = "text/html; charset=utf-8"
+    }
+}
+w.Header().Set("Content-Type", ct)
+```
+
+**Warning signs:**
+- Dashboard HTML loads but has no styling or interactivity
+- Browser DevTools Network tab shows `.css` files with `Content-Type: application/octet-stream`
+- Browser console shows "Refused to apply style from ... as it has MIME type text/plain"
+
+**Phase to address:** Phase 3 (dashboard scaffold) — verify content-type headers for all asset types in the phase acceptance test.
+
+---
+
+### Pitfall M14: uPlot / Alpine.js Bundled from CDN — Binary No Longer Works Offline
+
+**What goes wrong:**
+`index.html` references `<script src="https://cdn.jsdelivr.net/npm/uplot@1.6.31/dist/uPlot.iife.min.js">`. The CDN is fast and the file is reliably available. But jaimito's core value proposition is running on a VPS as a self-contained binary. If the VPS loses internet access (firewall rule change, ISP outage), the dashboard becomes non-functional. Worse, if the CDN removes the specific version or the file hash changes, the dashboard silently breaks even with internet access.
+
+**Why it happens:**
+CDN links are convenient for initial development and testing. Developers mean to embed the files "later" but the debt accumulates.
+
+**How to avoid:**
+Download and vendor the JS libraries into `web/dashboard/vendor/` at project setup time, then embed them:
+
+```
+web/dashboard/vendor/uplot.min.js    (~40KB, from uPlot releases)
+web/dashboard/vendor/alpine.min.js   (~15KB, from Alpine.js releases)
+```
+
+Reference them as relative paths in HTML:
+
+```html
+<script src="/dashboard/vendor/uplot.min.js"></script>
+<script src="/dashboard/vendor/alpine.min.js"></script>
+```
+
+Pin the exact version in a `web/dashboard/vendor/VERSIONS` file for auditability. Total overhead: ~55KB embedded in binary.
+
+**Warning signs:**
+- Dashboard requires network to load any JS or CSS
+- Disabling network on VPS causes blank/broken dashboard
+- `<script src="https://...">` tags visible in `index.html`
+
+**Phase to address:** Phase 3 (dashboard scaffold) — vendor all frontend dependencies before writing the first component. Never merge HTML that references external CDN URLs.
+
+---
+
+### Pitfall M15: High-Frequency Metric Collection Starves the VPS of CPU/IO
+
+**What goes wrong:**
+A user defines 10 custom metrics, each with a 5-second interval. Every 5 seconds, jaimito spawns 10 shell processes. Each shell forks the target command. On a 1-core VPS, this is 2 shell + 2 command processes running simultaneously, plus jaimito's existing goroutines. The VPS load average climbs. The services being monitored (nginx, postgres) become slower. jaimito's monitoring causes the very degradation it's meant to detect.
+
+**Why it happens:**
+Each metric's interval feels reasonable in isolation. The aggregate load is only visible when many metrics run simultaneously. A naively parallel collector runs all metrics at once when intervals align.
+
+**How to avoid:**
+- Set a minimum collection interval of 30 seconds in config validation — reject intervals below this.
+- Run metric collections sequentially (one at a time, not concurrently) by default. Only allow parallel collection if explicitly configured.
+- Add a configurable `max_concurrent_collections` limit (default: 1).
+- Stagger initial collection times: metric N starts at `N * (interval / num_metrics)` offset to spread the load.
+
+**Warning signs:**
+- VPS load average spikes every N seconds where N is the GCD of all collection intervals
+- `top` shows repeated short-lived `sh` and command processes
+- Metrics for system load show artificially high values (jaimito is inflating the metric it measures)
+
+**Phase to address:** Phase 1 (metric collector) — implement sequential-by-default collection and minimum interval validation before adding any custom metric support.
+
+---
+
+### Pitfall M16: adlio/schema Migration Ordering — New Metrics Tables Must Not Break Existing Data
+
+**What goes wrong:**
+jaimito uses `adlio/schema` with numbered SQL migration files (`001_initial.sql`, `002_nullable_title.sql`). The next migration for v2.0 must be `003_metrics.sql`. If a developer accidentally names it `002_metrics.sql` (confusing the naming convention) or introduces a migration that references the `messages` table with a constraint jaimito already has data for, the migration fails on existing deployments. The service fails to start. The migration is irreversible.
+
+**Why it happens:**
+Migration numbering is easy to get wrong when multiple developers work in parallel (not an issue for solo projects, but worth noting). More commonly, the new migration adds a NOT NULL column to `metric_readings` with no DEFAULT, then the 7-day purge runs and tries to read that column from rows inserted before the migration — which have NULL in that column.
+
+**How to avoid:**
+- Always use the next sequential number: currently `003`.
+- Never add NOT NULL columns without a DEFAULT to tables that may already exist (they won't — `metric_readings` is new in v2.0, but `api_keys` and `messages` are not).
+- Test the migration on a copy of a production database (not just an empty dev database).
+- The `003_metrics.sql` migration must only CREATE TABLE — no ALTER TABLE on existing tables unless absolutely required.
+
+**Warning signs:**
+- Service fails to start with "schema migration failed" after upgrade
+- `adlio/schema` migration tracker shows migration partially applied
+- `sqlite3 jaimito.db .tables` shows metrics tables missing after upgrade
+
+**Phase to address:** Phase 2 (schema + storage) — write `003_metrics.sql`, test on a DB that already has v1.x data (messages + api_keys populated).
+
+---
+
+### Pitfall M17: Dashboard Accessible on Public Interface — Sensitive VPS Data Exposed
+
+**What goes wrong:**
+jaimito's HTTP server binds to `127.0.0.1:8080` by default. When a reverse proxy (nginx/caddy) exposes jaimito's API to the internet for the webhook endpoint, the admin may configure the proxy to forward all paths — including `/dashboard`. Disk usage, memory, uptime, Docker container names, and custom metric data are now publicly accessible without authentication.
+
+**Why it happens:**
+The v1.0 server served only `/api/v1/notify` (authenticated) and `/api/v1/health` (unauthenticated). Adding `/dashboard` (unauthenticated by design — "localhost only via Tailscale") creates a new unauthenticated surface that existing reverse proxy configs may inadvertently expose.
+
+**How to avoid:**
+- Serve the dashboard on a separate port (e.g., `127.0.0.1:8081`) distinct from the API port (`127.0.0.1:8080`). Reverse proxy only exposes port 8080. Dashboard is only reachable locally or via Tailscale by connecting to port 8081.
+- Alternatively, add a chi middleware that checks `r.RemoteAddr` for loopback — reject non-loopback requests to `/dashboard` with 403.
+- Document in `DEPLOY.md`: "The dashboard port (8081) must NOT be exposed in your reverse proxy configuration."
+
+**Warning signs:**
+- `curl https://yourdomain.com/dashboard` returns the dashboard HTML (it should 404 or 403)
+- Nginx/Caddy config uses `proxy_pass http://127.0.0.1:8080/` (all paths proxied)
+- Dashboard port exposed in `firewall-cmd --list-ports` or `ufw status`
+
+**Phase to address:** Phase 3 (dashboard scaffold) — implement separate port or loopback-only middleware on the first day of dashboard work, before any data is served.
 
 ---
 
 ## v1.1 Setup Wizard Pitfalls (bubbletea TUI)
 
-These pitfalls are specific to adding an interactive `jaimito setup` bubbletea TUI wizard to the existing cobra CLI. They are the primary concern for the current milestone.
+These pitfalls addressed the interactive `jaimito setup` bubbletea TUI wizard. Kept for reference during ongoing development.
 
 ---
 
@@ -450,6 +985,12 @@ Implement `EscapeMarkdownV2(s string) string` or switch to `parse_mode: HTML`. T
 | Skip context propagation to bot instance reuse across steps | Less plumbing | Bot instance can go stale if token changes mid-flow | Never — implement token refresh on token change |
 | Skip atomic write (write-then-rename) for config | Simpler code | Power failure mid-write leaves corrupted config | Acceptable for v1.1 root-level writes (low risk) |
 | Single 15s timeout for all Telegram API calls | Less configuration | `getUpdates` can be slower than `getMe` | Acceptable |
+| Use Tailwind Play CDN instead of pre-compiled CSS | Zero build step | Requires internet at runtime; 300KB runtime overhead; offline dashboard broken | Never for production binary |
+| Run metric collection without per-command timeout | Simpler code | Goroutine accumulation; hung collectors; shutdown timeout | Never |
+| Alert on every threshold crossing without state tracking | Trivial to implement | Alert storms; Telegram rate limit triggered; notification fatigue | Never |
+| Reference frontend libraries from CDN in embedded HTML | Easy initial development | Binary requires internet; version drift; CDN outages break dashboard | Never — vendor all JS/CSS |
+| Collect metrics in parallel goroutines without concurrency limit | Faster collection | CPU/IO spikes; self-inflating system load metrics | Acceptable only if max_concurrent explicitly capped |
+| Place embed directive in a package that does not own the web/ dir | Follows package conventions | Build fails with "no matching files found" — must restructure | Never |
 
 ---
 
@@ -468,6 +1009,12 @@ Implement `EscapeMarkdownV2(s string) string` or switch to `parse_mode: HTML`. T
 | SQLite (WAL) | Opening database file with multiple processes simultaneously | Use WAL mode; `_busy_timeout=5000` in DSN; single process owns the file |
 | SQLite (WAL) | Not setting `_foreign_keys=on` in DSN | Add `?_foreign_keys=on&_journal_mode=WAL&_busy_timeout=5000` to DSN |
 | net/http webhook | Not returning 202 immediately and processing synchronously | Enqueue to SQLite, return 202, dispatch asynchronously |
+| `os/exec` + metric commands | Using `exec.Command("sh", "-c", cmd)` without context timeout | Always use `exec.CommandContext` with capped timeout |
+| `os/exec` + Docker commands | Killing parent sh leaves child docker processes running | Set `cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}` and kill process group |
+| `go:embed` | Placing `//go:embed` directive in package that does not own the path | Move embed directive to a package at or above the embedded path |
+| `go:embed` | Files named with leading `.` or `_` silently excluded | Name embedded files without leading dots or underscores |
+| `http.FileServer` + SPA | Unknown client-side routes return 404 instead of index.html | Implement SPA fallback handler; or use hash-based routing to avoid this entirely |
+| adlio/schema migrations | Adding v2.0 migration with wrong number (skipping or reusing a number) | Always use next sequential number; test migration on a DB with existing v1.x data |
 
 ---
 
@@ -481,6 +1028,10 @@ Implement `EscapeMarkdownV2(s string) string` or switch to `parse_mode: HTML`. T
 | Blocking Telegram API call in wizard `Update()` directly | TUI freezes during validation | Only call external APIs inside `tea.Cmd` | Immediately — first validation |
 | Multiple simultaneous validation requests from rapid typing | N API calls fired per keystroke | Debounce: only fire validation cmd on Enter, not each keystroke | As soon as user types fast |
 | Re-rendering entire wizard with expensive lipgloss operations | High CPU during spinner animation | Keep `View()` lightweight; cache rendered strings for static content | At ~10 animation ticks/second |
+| Metric collector holds SQLite transaction open during shell command execution | Message delivery latency spikes at every collection interval | Collect readings outside any transaction; write in a single batch transaction after all commands complete | At any collection interval |
+| High-frequency metric collection (intervals <30s) spawning many shell processes | VPS load average inflated; monitored processes show degraded performance | Enforce minimum 30s interval; run collections sequentially by default | With 5+ metrics at 10s intervals on a 1-core VPS |
+| `metric_readings` table not indexed by `(metric_name, collected_at)` | Dashboard API slow when fetching historical readings | Add index at schema creation | Noticeable at ~50,000 rows (7 days × 5 metrics × 5min intervals = 10,080 rows; custom metrics can push past 50k quickly) |
+| Full table scan for retention purge without index on `collected_at` | Purge job slow; holds write lock longer than necessary | Index `collected_at` or use the `(metric_name, collected_at)` composite index | At ~50,000 rows |
 
 ---
 
@@ -494,6 +1045,9 @@ Implement `EscapeMarkdownV2(s string) string` or switch to `parse_mode: HTML`. T
 | Bot token logged via `slog` during validation | Token appears in system logs | Never log the token value; log only "token validated" or "validation failed" |
 | Bot token in process environment visible in `/proc/PID/environ` | Leaked in crash dumps | Load from file at startup; clear from env after reading |
 | Webhook endpoint on public interface without IP restriction | Abuse from public internet | Bind to `127.0.0.1` by default; document reverse proxy requirement |
+| Config file with 0644 permissions allows anyone to read metric commands | Local user can see all custom monitoring logic and potentially modify it | Enforce 0600 on config at startup; refuse to load if permissions are too permissive |
+| Dashboard endpoint exposed through reverse proxy | VPS disk usage, memory, uptime, container names visible publicly | Serve dashboard on separate port not exposed in reverse proxy config |
+| Metric command values containing user-controlled data interpolated into shell string | Command injection via config | Never interpolate dynamic data into metric command strings; treat config as static trusted input |
 
 ---
 
@@ -509,10 +1063,28 @@ Implement `EscapeMarkdownV2(s string) string` or switch to `parse_mode: HTML`. T
 | Error messages truncated by terminal width | User cannot read full Telegram API error | Use `lipgloss.NewStyle().Width(termWidth - 4).Render(err.Error())` to wrap |
 | `jaimito wrap` sends notification on every success | Cron noise; notification fatigue | Default to notify-on-failure only; add `--always` flag |
 | Long truncated `body` from piped commands overwhelms Telegram | Telegram 4096-char limit; truncated context | Truncate at 3800 chars and append "… [truncated, N total chars]" |
+| Dashboard shows stale metrics with no "last updated" timestamp | User cannot tell if metrics are current or collector is broken | Show `collected_at` timestamp on each metric row; highlight if >2× interval has elapsed since last reading |
+| Alert notification has no link to dashboard | User receives "disk at 92%" with no context | Include current value, threshold, and "check dashboard at http://..." in alert message |
+| `jaimito status` CLI shows all-time max/min instead of current value | Misleading at a glance | Default to showing most recent reading; use `--history` flag for time series |
 
 ---
 
 ## "Looks Done But Isn't" Checklist
+
+### Metrics & Dashboard (v2.0)
+- [ ] **Command timeout:** Every metric command is wrapped in `exec.CommandContext` — verify with a `sleep 60` test command that collection times out, does not hang
+- [ ] **Process group kill:** Docker and multi-process commands leave no orphaned children — check with `ps aux --forest` after a forced timeout
+- [ ] **Write-lock separation:** Metric inserts do not overlap with active dispatcher transactions — add timing logs to verify write latency during collection intervals
+- [ ] **Embedded asset completeness:** `TestEmbeddedAssets` verifies index.html, tailwind.css, uplot.min.js, alpine.min.js are all present in the embedded FS
+- [ ] **Offline operation:** Dashboard fully functional with `iptables -P OUTPUT DROP` (no internet) — all assets load from embedded FS
+- [ ] **Alert state machine:** Two consecutive collections above threshold fire exactly ONE alert, not two — confirm in integration test
+- [ ] **Alert flapping:** Metric oscillating between 89% and 91% (threshold 90%) with no recovery threshold fires at most 1 alert per hour
+- [ ] **Migration on existing DB:** `003_metrics.sql` applied to a DB with existing messages and api_keys — service starts without error, existing data intact
+- [ ] **Dashboard port isolation:** `curl http://localhost:8080/dashboard` returns 404 (API port); `curl http://localhost:8081/dashboard` returns 200 (dashboard port)
+- [ ] **Content-Type headers:** Browser DevTools confirms `.js` → `application/javascript`, `.css` → `text/css` for all embedded assets
+- [ ] **Retention purge:** After running purge with timezone set to UTC-5, no readings younger than 7 actual UTC days are deleted
+- [ ] **Graceful shutdown:** `systemctl stop jaimito` completes within 10 seconds — no "Timeout: killing process" in journalctl
+- [ ] **Sequential collection:** With 5 metrics defined, `ps aux` never shows more than 1 `sh` process spawned by jaimito at a time (default sequential mode)
 
 ### Setup Wizard (v1.1)
 - [ ] **stdin detection:** Verify `< /dev/tty` redirect in install.sh is before `jaimito setup` call — check `bash -x install.sh` output
@@ -554,6 +1126,10 @@ Implement `EscapeMarkdownV2(s string) string` or switch to `parse_mode: HTML`. T
 | SQLite WAL corruption from hard kill | MEDIUM | Stop service; `sqlite3 jaimito.db "PRAGMA integrity_check"`; restore from backup |
 | Stuck messages in `dispatching` status | LOW | `UPDATE messages SET status='queued', retry_count=0 WHERE status='dispatching'`; restart |
 | Telegram bot banned (repeated 429 abuse) | MEDIUM | Wait 1-24h for unban; implement rate limiting; test with `getMe` |
+| Alert storm — unlimited identical alerts sent | MEDIUM | Deploy with state machine fix; backfill `alert_state` table; user likely muted Telegram chat already |
+| Goroutine leak from hung metric commands | MEDIUM | `kill -9` jaimito; redeploy with `WaitDelay` fix; check for orphaned sh processes with `pkill -f 'sh -c'` |
+| Dashboard assets 404 due to embed exclusion | LOW | Add `TestEmbeddedAssets` test; fix file naming; redeploy |
+| Migration failed on existing DB | HIGH | Do NOT attempt to re-run migration manually; restore from backup; fix migration SQL; redeploy |
 
 ---
 
@@ -561,6 +1137,23 @@ Implement `EscapeMarkdownV2(s string) string` or switch to `parse_mode: HTML`. T
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
+| Shell command injection via config | v2.0 Phase 1: Metric collector | Config file permission enforced on startup; dynamic data never interpolated into commands |
+| os/exec no timeout — hanging collector | v2.0 Phase 1: Metric collector | `sleep 60` command times out; no goroutine accumulation after 5 collections |
+| Child process orphans (Docker) | v2.0 Phase 1: Metric collector | `ps aux --forest` shows no orphaned children after forced timeout |
+| Metric writes block message delivery | v2.0 Phase 1 + Phase 2 | Notification latency unchanged after adding metrics; collect-then-write pattern enforced |
+| go:embed path resolution | v2.0 Phase 3: Dashboard scaffold | `go build` succeeds; embedded asset test passes |
+| go:embed silent exclusion of dot/underscore files | v2.0 Phase 3: Dashboard scaffold | `TestEmbeddedAssets` asserts all critical files present |
+| SPA routing 404 | v2.0 Phase 3: Dashboard scaffold | Direct URL navigation to all dashboard routes returns 200 (or hash routing chosen to avoid issue) |
+| Tailwind Play CDN embedded | v2.0 Phase 3: Dashboard scaffold | Dashboard loads fully with network disabled |
+| Alert storm (no state machine) | v2.0 Phase 4: Threshold alerting | Integration test: 5 consecutive threshold crossings fire exactly 1 alert |
+| Alert flapping (no hysteresis) | v2.0 Phase 4: Threshold alerting | Oscillating metric fires at most 1 alert/hour |
+| Collector goroutine leak on shutdown | v2.0 Phase 1: Metric collector | `systemctl stop jaimito` completes in <10s |
+| Metric timestamp timezone mismatch | v2.0 Phase 2: Schema + storage | All `collected_at` stored as UTC; purge test with TZ=America/New_York |
+| Wrong content-type headers for JS/CSS | v2.0 Phase 3: Dashboard scaffold | Browser DevTools network tab shows correct MIME types |
+| Frontend JS/CSS from CDN (not embedded) | v2.0 Phase 3: Dashboard scaffold | Binary passes offline test; no external script tags in index.html |
+| VPS load inflation from metric collection | v2.0 Phase 1: Metric collector | Sequential-by-default collection; minimum 30s interval enforced in config validation |
+| Migration breaks existing data | v2.0 Phase 2: Schema + storage | Migration tested on DB with existing messages and api_keys |
+| Dashboard exposed through reverse proxy | v2.0 Phase 3: Dashboard scaffold | Dashboard on separate port; DEPLOY.md updated with warning |
 | Stdin pipe hang (curl\|bash) | v1.1 Phase 1: Cobra command scaffold | `echo "" \| ./jaimito setup` must print error and exit 1 |
 | Bubbletea output invisible/unstyled | v1.1 Phase 1: Cobra command scaffold | Test inside subshell with redirected stdout |
 | Stale async validation response | v1.1 Phase 2: Bot token + channel validation | Fire two rapid validations; only last result applies |
@@ -582,16 +1175,32 @@ Implement `EscapeMarkdownV2(s string) string` or switch to `parse_mode: HTML`. T
 
 ## Sources
 
+**Metrics & Dashboard (v2.0):**
+- [Understanding command injection vulnerabilities in Go — Snyk](https://snyk.io/blog/understanding-go-command-injection-vulnerabilities/) — HIGH confidence (official security research)
+- [os/exec: CommandContext does not respect context timeout — golang/go issue #57129](https://github.com/golang/go/issues/57129) — HIGH confidence (official Go tracker)
+- [os/exec: CommandContext with multiple subprocesses not canceled — golang/go issue #22485](https://github.com/golang/go/issues/22485) — HIGH confidence (official Go tracker)
+- [os/exec resource leak on exec failure — golang/go issue #69284](https://github.com/golang/go/issues/69284) — HIGH confidence (official Go tracker, 2024)
+- [SQLite concurrent writes and "database is locked" errors — tenthousandmeters.com](https://tenthousandmeters.com/blog/sqlite-concurrent-writes-and-database-is-locked-errors/) — HIGH confidence
+- [The Write Stuff: Concurrent Write Transactions in SQLite — oldmoe.blog 2024](https://oldmoe.blog/2024/07/08/the-write-stuff-concurrent-write-transactions-in-sqlite/) — HIGH confidence
+- [embed package — pkg.go.dev](https://pkg.go.dev/embed) — HIGH confidence (official)
+- [How to Use //go:embed — blog.carlana.net](https://blog.carlana.net/post/2021/how-to-use-go-embed/) — MEDIUM confidence (practitioner, 2021, still accurate)
+- [Embedded File Systems: Using embed.FS in Production — DEV Community](https://dev.to/rezmoss/embedded-file-systems-using-embedfs-in-production-89-2fpa) — MEDIUM confidence
+- [Fileserver example for an SPA — go-chi/chi issue #611](https://github.com/go-chi/chi/issues/611) — MEDIUM confidence (community pattern, widely referenced)
+- [Play CDN not for production — Tailwind CSS official docs](https://tailwindcss.com/docs/installation/play-cdn) — HIGH confidence (official)
+- [Stop Using Tailwind CDN — DEV Community](https://dev.to/mr_nova/stop-using-tailwind-cdn-build-only-the-css-you-actually-use-django-php-go-1h38) — MEDIUM confidence
+- [Recovery thresholds for alerts — Grafana Labs 2024](https://grafana.com/whats-new/2024-01-06-recovery-thresholds-for-alerts/) — HIGH confidence (official Grafana)
+- [Reduce alert flapping — Datadog docs](https://docs.datadoghq.com/monitors/guide/reduce-alert-flapping/) — HIGH confidence (official Datadog)
+- [Go Concurrency Mastery: Preventing Goroutine Leaks — DEV Community](https://dev.to/serifcolakel/go-concurrency-mastery-preventing-goroutine-leaks-with-context-timeout-cancellation-best-1lg0) — MEDIUM confidence
+- [proposal: vet: report goroutine leak using time.Ticker — golang/go issue #68483](https://github.com/golang/go/issues/68483) — HIGH confidence (official Go tracker)
+- [Killing a process and all of its descendants in Go — sigmoid.at](https://sigmoid.at/post/2023/08/kill_process_descendants_golang/) — MEDIUM confidence (practitioner)
+
 **Setup Wizard (v1.1):**
 - [bubbletea issue #860: stdout not a terminal workaround](https://github.com/charmbracelet/bubbletea/issues/860) — MEDIUM confidence (open issue, community workaround documented)
 - [DeepWiki: Concurrency and Goroutines in bubbletea](https://deepwiki.com/charmbracelet/bubbletea/5.1-concurrency-and-goroutines) — MEDIUM confidence
 - [bubbletea PR #1372: fix deadlock on context cancellation](https://github.com/charmbracelet/bubbletea/pull/1372) — HIGH confidence (merged fix)
-- [Tips for building Bubble Tea programs](https://leg100.github.io/en/posts/building-bubbletea-programs/) — MEDIUM confidence (independent practitioner)
-- [Loss of input in Charm's Bubbletea](https://dr-knz.net/bubbletea-control-inversion.html) — MEDIUM confidence (independent technical analysis)
 - [Commands in Bubble Tea (official Charm blog)](https://charm.land/blog/commands-in-bubbletea/) — HIGH confidence (official)
 - [golang/go issue #56173: os.WriteFile is not atomic](https://github.com/golang/go/issues/56173) — HIGH confidence (official Go tracker)
 - [golang/go issue #35835: umask and os.WriteFile permissions](https://github.com/golang/go/issues/35835) — HIGH confidence (official Go tracker)
-- [linuxvox.com: Why Bash Script Input Prompts Fail via cURL](https://linuxvox.com/blog/execute-bash-script-remotely-via-curl/) — HIGH confidence (well-known bash behavior)
 
 **Core Hub (v1.0):**
 - [SQLite Concurrent Writes — tenthousandmeters.com](https://tenthousandmeters.com/blog/sqlite-concurrent-writes-and-database-is-locked-errors/) — HIGH confidence
@@ -601,5 +1210,5 @@ Implement `EscapeMarkdownV2(s string) string` or switch to `parse_mode: HTML`. T
 - [Telegram Bot API Errors list](https://github.com/TelegramBotAPI/errors) — MEDIUM confidence (community-maintained)
 
 ---
-*Pitfalls research for: jaimito — VPS Push Notification Hub (Go + SQLite + Telegram Bot API + CLI + bubbletea TUI wizard)*
-*Researched: 2026-02-20 (v1.0 MVP) | Updated: 2026-03-23 (v1.1 Setup Wizard)*
+*Pitfalls research for: jaimito — VPS Push Notification Hub (Go + SQLite + Telegram Bot API + CLI + bubbletea TUI wizard + metrics collector + embedded web dashboard)*
+*Researched: 2026-02-20 (v1.0 MVP) | Updated: 2026-03-23 (v1.1 Setup Wizard) | Updated: 2026-03-26 (v2.0 Métricas y Dashboard)*

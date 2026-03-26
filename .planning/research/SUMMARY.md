@@ -1,189 +1,185 @@
 # Project Research Summary
 
-**Project:** jaimito
-**Domain:** Self-hosted VPS push notification hub (Go + SQLite + Telegram)
-**Researched:** 2026-02-20
+**Project:** jaimito v2.0 — Metricas y Dashboard
+**Domain:** Go metrics collector + embedded web dashboard added to existing notification hub
+**Researched:** 2026-03-26
 **Confidence:** HIGH
 
 ## Executive Summary
 
-Jaimito is a self-hosted, single-binary notification hub that receives alerts via HTTP webhook and CLI, queues them durably in SQLite, and dispatches them to Telegram. The dominant pattern for this class of tool (ntfy, Gotify) is an HTTP ingest endpoint with bearer token auth, a persistent queue, and async dispatch. Jaimito's architectural distinction is that it is push-only (no subscribe model), which enables server-side retry — a gap that ntfy and Gotify leave to the client. The recommended stack is unambiguous: Go 1.26, `modernc.org/sqlite` (CGO-free), `go-chi/chi` for HTTP routing, `spf13/cobra` for CLI, and `go-telegram/bot` for dispatch. All library versions are verified current as of February 2026.
+jaimito v2.0 extiende un Go binary ya existente y funcional (notificaciones Telegram + SQLite + CLI) con recoleccion de metricas de sistema y un dashboard web embebido. El enfoque correcto, validado por investigacion directa del codebase y analisis de herramientas comparables (Beszel, Netdata, Glances), es construir todo dentro del mismo binario sin introducir nuevos procesos, bases de datos externas, ni toolchains de frontend. La unica dependencia Go nueva es `gopsutil/v4` para metricas nativas; el frontend usa Alpine.js, uPlot y Tailwind CSS pre-compilado embebidos via `go:embed`.
 
-The killer feature is `jaimito wrap <cmd>`, a cron job wrapper that captures exit codes and output and notifies only on failure. No competitor bundles this in its core binary. Combined with Telegram-native MarkdownV2 formatting and in-process key management, jaimito has a clear differentiation story for the VPS operator audience. The MVP is achievable in a single development phase covering the full ingest-queue-dispatch loop plus the CLI, with observability and rate limiting following in a second phase.
+La arquitectura se organiza en capas claramente separadas: un paquete `internal/metrics/` nuevo (goroutine de coleccion), una extension del paquete `internal/db/` existente (nuevo schema SQL + funciones CRUD), nuevas rutas en `internal/api/` (handlers de metricas + servido del dashboard), y activos estaticos embebidos en `internal/web/`. El dispatcher y el bot de Telegram no cambian — las alertas de umbral se enolan como mensajes ordinarios via `db.EnqueueMessage()`, reutilizando toda la infraestructura de entrega existente.
 
-The primary risks are all known and well-documented: SQLite write concurrency requires explicit `BEGIN IMMEDIATE` transactions or a single-writer goroutine pattern; Telegram's 429 rate limit requires honoring the `retry_after` field, not fixed-delay retries; and MarkdownV2 requires escaping 18 special characters in dynamic content. All three risks have clear prevention strategies that must be built into Phase 1, not retrofitted. A secondary risk is that `jaimito wrap` deployed to production cron jobs without deduplication in place can trigger notification storms — Phase 2 deduplication should land before any production cron integration.
+Los riesgos principales son de implementacion: inyeccion de comandos via config.yaml (mitigado con permisos 0600 y metricas predefinidas hardcodeadas en Go), goroutines colgadas por falta de timeout en `exec.CommandContext` (requiere timeout explicito + `cmd.WaitDelay`), contension en el pool SQLite de un solo escritor (mitigado separando ejecucion de comando de las escrituras a la DB), y errores de compilacion por rutas incorrectas en `go:embed`. Todos estos riesgos tienen patrones de prevencion documentados y bien conocidos.
+
+---
 
 ## Key Findings
 
 ### Recommended Stack
 
-The stack is 100% CGO-free Go, enabling true `CGO_ENABLED=0` cross-compilation to `linux/amd64` and `linux/arm64`. `modernc.org/sqlite` (a pure-Go transpilation of SQLite C) replaces the more commonly documented `mattn/go-sqlite3`, eliminating the CGO and GCC dependencies that would break the single-binary deployment promise. The performance trade-off (10-15% slower writes) is irrelevant at jaimito's expected volume.
+El stack v2.0 agrega exactamente una dependencia Go nueva sobre el stack existente. No hay cambios de framework, no hay nuevo servidor web, no hay nueva base de datos. El dashboard completo vive como archivos estaticos embebidos (~30KB total gzipeado).
 
 **Core technologies:**
-- **Go 1.26** — latest stable (released 2026-02-10); stdlib `net/http` ServeMux routing, `log/slog` structured logging, `go:embed` for migrations; single binary <10MB
-- **`modernc.org/sqlite` v1.46.1** — CGO-free SQLite driver; WAL mode supported; critical for the single-binary deployment promise
-- **`go-chi/chi/v5` v5.2.5** — stdlib-compatible HTTP router; middleware grouping enables per-route auth, rate limiting, and request logging cleanly
-- **`spf13/cobra` v1.10.2** — CLI subcommands (`send`, `wrap`, `keys`, `status`); shell completion auto-generated
-- **`go-telegram/bot` v1.19.0** — zero-dependency Telegram Bot API 9.4 wrapper; typed 429 errors with `retry_after` for backoff logic
-- **`pressly/goose/v3` v3.26.0** — embedded SQL migrations at startup; transaction-safe (unlike golang-migrate); native `slog` integration
-- **`google/uuid` v1.6.0** — UUID v7 (time-ordered) as primary key; sortable without a separate `created_at` index
-- **`go.yaml.in/yaml/v3` v3.0.4** — canonical YAML library (gopkg.in/yaml.v3 is unmaintained; cobra already migrated)
 
-**Do not use:** `mattn/go-sqlite3` (breaks cross-compile), `gin-gonic/gin` (50+ deps, custom context), `go-telegram-bot-api/v5` (stale, Dec 2021), `gorilla/mux` (archived), `GORM` (unnecessary for 2-table schema), `gopkg.in/yaml.v3` (unmaintained).
+- `gopsutil/v4@v4.26.2`: metricas de sistema (CPU, RAM, disco, uptime, Docker) — CGO-free, puro Go, soporta amd64 y arm64; elimina parsing de output de comandos shell para metricas predefinidas
+- `Alpine.js v3.14.x` (~7.1KB gzipeado): reactividad del dashboard (tabla, toggle de chart, auto-refresh) — cero build toolchain en CI, funciona con un `<script>` tag
+- `uPlot v1.6.32` (~15KB gzipeado): chart de series temporales — 5x mas liviano que Chart.js, renderiza 3600 puntos a 60fps, API orientada a time-series puro
+- Tailwind CSS v4 pre-compilado (<10KB): generado una vez por el desarrollador con el CLI standalone (sin Node.js), commiteado al repo, embebido via `go:embed`
+- `go:embed` (stdlib): embebe todo el directorio `web/static/` en el binario; sin nueva dependencia
+- SQLite WAL via `modernc.org/sqlite` (ya existente): dos tablas nuevas (`metrics` + `metric_reads`) via migracion numerada `003_metrics.sql`
+
+**Critico:** No usar Tailwind Play CDN (requiere red en runtime), no usar Chart.js (254KB vs 47.9KB de uPlot), no abrir una segunda conexion SQLite para lecturas del dashboard (el pool `SetMaxOpenConns(1)` es suficiente y correcto a escala VPS).
 
 ### Expected Features
 
-The feature research surveyed ntfy, Gotify, and Apprise and identified three categories.
+**Must have (table stakes):**
+- CPU, RAM, disco, uptime como metricas predefinidas con zero config
+- Vista de tabla con valor actual, unidad, status (OK/WARN/CRIT) y ultima lectura
+- Chart de series temporales expandible por click (uPlot, ultimas N lecturas)
+- Alertas de umbral warning/critical a Telegram (estado maquina, no por cada lectura)
+- Purga automatica de lecturas antiguas (7 dias por defecto)
+- `jaimito status` CLI — salida tabular de valores actuales desde terminal
+- `jaimito metric push` CLI — ingestion manual para scripts externos
 
-**Must have (table stakes) — v0.1:**
-- `POST /api/v1/notify` with Bearer token auth — the ingest gate; unauthenticated endpoint is not internet-safe
-- `GET /api/v1/health` — required by UptimeKuma, Gatus, and other monitors
-- SQLite queue with WAL mode — message durability across restarts; ntfy defaults to 12h cache, Gotify keeps until deleted
-- Telegram dispatcher with priority-based emoji formatting — Telegram is the UI; no persistence needed in jaimito itself
-- Automatic retry with exponential backoff — the gap ntfy and Gotify both leave open; jaimito's dispatch model is the fix
-- Priority system: critical/high/normal/low with cosmetic differentiation — urgency signaling; behavioral differentiation deferred
-- `jaimito send` CLI — shell integration without curl boilerplate
-- `jaimito wrap <cmd>` — captures exit code and output; notifies on failure; the killer feature
-- `jaimito keys create/list/revoke` — in-process key management without config edits or restarts
-- YAML config at `/etc/jaimito/config.yaml` — version-controllable, automation-friendly
-- Channel-based routing with named channels — organizes alert sources; channel defaults in config
+**Should have (competitive):**
+- Metricas custom via comandos shell en config.yaml — el diferenciador principal (ssl_expiry, pg_connections, queue_depth)
+- Maquina de estados de alertas (NORMAL/WARNING/CRITICAL por metrica, transition-only) — evita alert storm
+- REST API: `GET /api/v1/metrics`, `GET /api/v1/metrics/{name}/readings`, `POST /api/v1/metrics/ingest`
+- Docker container count como metrica predefinida (graceful si Docker no esta instalado)
 
-**Should have (competitive) — v0.2-v0.3:**
-- Rate limiting per channel — prevents notification storms from looping cron jobs
-- Quiet hours (do-not-disturb window) — needed for daily-schedule operators
-- Simple deduplication (same message within N minutes = suppress) — covers 80% of alert fatigue
-- `jaimito list` CLI — query recent messages and delivery status
-- Message queue drain on SIGTERM — flush pending notifications before exit
+**Defer (v2.x):**
+- Notificacion de recuperacion ("CPU volvio a normal")
+- Retention window configurable en config.yaml (hoy hardcodeado 7 dias)
+- Metricas Docker mas granulares (stats por container)
 
-**Defer (v1.0+):**
-- Dead man's switch / heartbeat monitoring — healthchecks.io exists; build only if explicitly requested
-- Web dashboard — Telegram history plus `jaimito list` satisfies the use case; a dashboard is a product pivot
-- Multi-dispatcher (Email, Slack, Discord) — Apprise covers this; recommend integration rather than rebuilding
-- Plugin system — maintenance burden exceeds value at this scale
-
-**Confirmed anti-features (deliberate omissions):** WebSocket stream, multi-user support, attachment storage, SMTP ingestor, message templating engine.
+**Fuera de scope (v3+):**
+- Downsampling/agregacion de metricas historicas
+- Dashboard multi-VPS
+- Canales de alerta adicionales (Slack, email)
 
 ### Architecture Approach
 
-The architecture is a simple 3-layer pipeline: **Ingestion** (HTTP webhook `POST /api/v1/notify` + `jaimito send` CLI) writes to the **Queue** (SQLite WAL-mode `messages` table), and the **Dispatcher** (background goroutine loop) reads from the queue and delivers to Telegram, updating status on success or incrementing `retry_count` and setting `next_retry_at` on failure. There is no external message broker; SQLite is the queue. This matches the architecture of similar single-binary tools (ntfy, Gotify) and is appropriate for the single-user VPS deployment target.
+La arquitectura es una extension minima del binario existente. Un nuevo paquete `internal/metrics/collector.go` implementa una goroutine con ticker grueso (10s) que evalua que metricas vencieron su intervalo, ejecuta el comando shell via `exec.CommandContext` con timeout, y escribe el resultado en SQLite. Las alertas se generan encolando mensajes ordinarios via `db.EnqueueMessage()` — el dispatcher existente los entrega a Telegram sin ningun cambio. El dashboard es un `index.html` + `app.js` servido desde `internal/web/static/` via `http.FileServer(http.FS(web.StaticFS))` registrado como catch-all en el router chi existente.
 
 **Major components:**
-1. **HTTP Server** (chi router) — accepts `POST /api/v1/notify`, `GET /api/v1/health`; auth middleware on `/api/v1/*`; writes 202 immediately and enqueues
-2. **SQLite Queue** (modernc.org/sqlite + goose migrations) — `messages` table with `status`, `priority`, `channel`, `retry_count`, `next_retry_at`, `dedupe_key`; `api_keys` table; WAL mode; single-writer connection pool
-3. **Dispatcher Loop** (goroutine) — polls queue for `status='queued' AND next_retry_at <= now`; dispatches to Telegram; updates status; reclaims stuck `dispatching` rows on startup
-4. **Telegram Dispatcher** (go-telegram/bot) — sends with MarkdownV2; handles 429 with `retry_after`; detects permanent errors (403, 400 chat not found) and marks `failed` without retry
-5. **CLI** (cobra) — `jaimito send` (HTTP call to local server or direct queue write), `jaimito wrap` (execute + capture output + send on failure), `jaimito keys` (CRUD on `api_keys` table), `jaimito status` (queue depth, dispatcher state)
+1. `internal/metrics/collector.go` (NUEVO) — goroutine de coleccion, evaluacion de umbrales, encolado de alertas
+2. `internal/db/metrics.go` + `003_metrics.sql` (NUEVO) — schema y CRUD para `metrics` y `metric_reads`
+3. `internal/api/handlers.go` (MODIFICADO) — handlers `MetricsHandler`, `ReadingsHandler`, `IngestHandler`
+4. `internal/web/` (NUEVO) — `embed.go` + activos estaticos del dashboard
+5. `cmd/jaimito/metric.go` + `status.go` (NUEVO) — subcomandos CLI
+
+**Archivos sin cambios:** `dispatcher.go`, `telegram/`, `db/db.go`, `db/messages.go`, `api/middleware.go`, todos los subcomandos existentes.
 
 ### Critical Pitfalls
 
-1. **SQLite DEFERRED transactions cause SQLITE_BUSY under concurrent writes** — the dispatcher and HTTP ingestor writing simultaneously will race. Prevention: set `MaxOpenConns(1)` on the write connection pool (single-writer pattern) and use `BEGIN IMMEDIATE` for any write transaction. Set `busy_timeout=5000` in the DSN as a floor, but do not rely on it as the only guard. Must be correct in Phase 1; wrong defaults cause subtle data loss that is hard to reproduce later.
+1. **Sin timeout en exec.CommandContext** (M2) — usar siempre `exec.CommandContext` con timeout = min(80% del intervalo, 30s) + `cmd.WaitDelay = 5s`. Un comando que cuelga bloquea la goroutine de coleccion indefinidamente y acumula goroutines zombies.
 
-2. **Telegram 429 rate limit blacklists the bot IP, not just the burst** — if the dispatcher retries immediately on 429, Telegram bans the bot IP for 30 seconds and all notifications fail. Prevention: parse `retry_after` from every 429 response (and `adaptive_retry` from Bot API 8.0+); store `now + retry_after` in `next_retry_at`; never retry synchronously. Implement a per-dispatcher token bucket (1 msg/sec per chat, 20/min for groups) proactively. Will be triggered in the first week of real use if any cron jobs run at round minutes.
+2. **Escritura a SQLite dentro de la ejecucion del comando** (M4) — jamas abrir una transaccion, ejecutar el shell command, y despues commitear. Patron correcto: ejecutar comando fuera de cualquier transaccion → guardar resultado → abrir TX → INSERT → commit inmediato.
 
-3. **Telegram MarkdownV2 requires escaping 18 special characters** — unescaped `.`, `-`, `(`, `)`, `!`, `_`, and backticks cause a 400 Bad Request and the message is silently lost (not retried). Production alert bodies always contain these characters. Prevention: implement `EscapeMarkdownV2(s string) string` at the same time as the dispatcher, not as a follow-up. Alternative: use `parse_mode: HTML` (only 4 characters to escape).
+3. **Rutas incorrectas en go:embed** (M5) — la directiva `//go:embed` solo acepta rutas relativas al archivo que la contiene, sin `..`. Crear `internal/web/embed.go` y colocar `static/` como subdirectorio de `internal/web/`.
 
-4. **Dispatcher goroutine can leave messages stuck in `dispatching` status** — a crash mid-dispatch leaves rows that are never reclaimed. Prevention: add `dispatching_since` timestamp column; on startup, reclaim any `dispatching` rows older than `2 * dispatch_timeout`; enforce `max_retries` hard limit and transition to `failed` status with the error reason preserved.
+4. **Tailwind Play CDN en produccion** (M8) — Pre-compilar Tailwind con el CLI standalone antes de `go build` y commitear el CSS resultante. El Play CDN requiere red en runtime y carga 300KB inutiles.
 
-5. **Plain-text secrets in YAML config committed to git** — Telegram bot token in `config.yaml` committed and pushed is permanently in git history. Prevention: add `config.yaml` and `*.db` to `.gitignore` before the first commit; support `JAIMITO_TELEGRAM_BOT_TOKEN` env var override; enforce `0600` file permissions at startup.
+5. **go:embed excluye archivos que empiezan con `.` o `_`** (M6) — nombrar todos los activos sin punto ni guion bajo al inicio. Agregar test que verifica que `index.html` y `tailwind.css` estan presentes en el FS embebido.
+
+6. **Orphaned child processes al matar sh** (M3) — para comandos que invocan cadenas de procesos (docker, systemctl), usar `cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}` y matar el grupo completo en timeout.
+
+---
 
 ## Implications for Roadmap
 
-Based on combined research, the ingest-queue-dispatch pipeline has clear internal dependencies that dictate a natural build order. The HTTP server and SQLite layer must be working before the dispatcher has anything to consume. The CLI `send` command shares the delivery pipeline with `wrap`, so they come together. Observability and rate limiting are meaningful only once the core loop is proven stable.
+La investigacion de arquitectura ya provee un orden de fases explicitamente validado por dependencias del compilador. Las fases pueden ejecutarse en orden y algunas en paralelo.
 
-### Phase 1: Foundation and Core Pipeline
+### Phase 1: Config + Schema Foundation
+**Rationale:** Todo lo demas depende de estas dos piezas. `MetricDef` struct en config debe existir antes de escribir el collector; el schema SQL debe existir antes de las funciones CRUD. Sin esto, ninguna otra fase compila.
+**Delivers:** `internal/config/config.go` extendido con `MetricDef`, migracion `003_metrics.sql` con tablas `metrics` y `metric_reads` (+ indice compuesto), funciones CRUD en `internal/db/metrics.go`
+**Addresses:** Dependencia base de todas las features de v2.0
+**Avoids:** M4 (schema correcto desde el inicio previene retrofitting de indices en tabla poblada)
 
-**Rationale:** The entire product value depends on a working ingest-queue-dispatch loop. Auth must ship with the ingest endpoint (not retrofitted), and the SQLite connection pool must be configured correctly from day one. All six critical pitfalls are Phase 1 concerns; retrofitting any of them is expensive.
+### Phase 2: Metrics Collector
+**Rationale:** El nucleo del milestone. Depende de Phase 1 (config types + db functions). Una vez que el collector funciona con metricas predefinidas, el valor central del milestone es visible y testeable end-to-end.
+**Delivers:** `internal/metrics/collector.go` con goroutine de ticker, evaluacion de umbrales, y encolado de alertas; integracion en `serve.go`
+**Uses:** `gopsutil/v4` para metricas predefinidas; `exec.CommandContext` con timeout para metricas custom
+**Avoids:** M1 (permisos 0600), M2 (timeout obligatorio), M3 (process group kill), M4 (collect-then-write)
 
-**Delivers:** A deployable service that receives HTTP webhook notifications, queues them durably, and dispatches to Telegram with retry. Covers the primary use case: silent cron failure alerting.
+### Phase 3: REST API + CLI
+**Rationale:** Independiente del Phase 2 en implementacion (ambos dependen de Phase 1). Puede desarrollarse en paralelo al collector. La API es prerequisito del dashboard; los CLI usan la API o la DB directamente.
+**Delivers:** Endpoints `GET /api/v1/metrics`, `GET /api/v1/metrics/{name}/readings`, `POST /api/v1/metrics/ingest`; subcomandos `jaimito status` y `jaimito metric push`
+**Implements:** Router chi extension, handlers, auth inheritance para ingest
 
-**Addresses (from FEATURES.md):** HTTP webhook endpoint, Bearer token auth, SQLite WAL queue, Telegram dispatcher, automatic retry with exponential backoff, priority system (cosmetic), health check endpoint, YAML config.
+### Phase 4: Embedded Dashboard
+**Rationale:** Depende de Phase 3 (necesita la API estable). El dashboard es un consumidor de la API, no un productor. El valor visible del milestone — la interfaz web — se entrega aqui.
+**Delivers:** `internal/web/embed.go` + `static/index.html` + `static/app.js`; tabla de metricas con Alpine.js; chart expandible con uPlot; auto-refresh 30s
+**Uses:** Alpine.js v3, uPlot v1.6.32, Tailwind CSS pre-compilado
+**Avoids:** M5 (embed.go en lugar correcto), M6 (nombres sin `.`/`_`), M7 (no routing por URL path), M8 (no Play CDN)
 
-**Avoids (from PITFALLS.md):** SQLite DEFERRED transaction race (single-writer pattern from day one), CGO binary breakage (modernc.org/sqlite from the start), Telegram 429 mishandling (parse retry_after in initial dispatcher), MarkdownV2 escaping (implement EscapeMarkdownV2 with the dispatcher), request body size limit (MaxBytesReader in handler setup), stuck dispatching rows (startup reclaim logic), secrets in git (gitignore and env var override before first commit).
-
-### Phase 2: CLI and Developer Experience
-
-**Rationale:** Once the server pipeline is stable, the CLI completes the user-facing surface. `jaimito send` and `jaimito wrap` share the delivery pipeline already built in Phase 1. Key management via CLI requires the `api_keys` table (Phase 1 dependency). `wrap` is the differentiating feature and should land before any other enhancement.
-
-**Delivers:** A complete CLI (`send`, `wrap`, `keys`, `status`); operator can use jaimito from shell scripts and cron without curl boilerplate; `wrap` solves the silent cron failure use case natively.
-
-**Addresses (from FEATURES.md):** `jaimito send`, `jaimito wrap <cmd>` (killer feature), `jaimito keys create/list/revoke`, channel-based routing with named channels.
-
-**Avoids (from PITFALLS.md):** CLI API key in shell history (credential priority: env var -> config file -> prompt, never CLI flag), `wrap` notify-on-every-success noise (default to failure-only; --always flag for success), Telegram 4096-char message limit from `wrap` output (truncate at 3800 chars with truncation indicator), CLI exit code 0 on server unreachable (must exit 1 on non-2xx or connection refused).
-
-**Note:** Do not deploy `jaimito wrap` to production cron jobs before Phase 3 deduplication is in place. A looping cron job will flood Telegram and trigger rate limiting.
-
-### Phase 3: Reliability and Rate Control
-
-**Rationale:** The features in Phase 1 and 2 are sufficient to hit notification storms from looping cron jobs or repeated failures. Deduplication and rate limiting are the difference between jaimito being useful and being silenced by alert fatigue. The WAL file monitoring belongs here as an operational stability concern.
-
-**Delivers:** Rate limiting per channel, simple deduplication by `dedupe_key`, quiet hours, `jaimito list` for delivery status queries, WAL checkpoint monitoring in health endpoint, graceful shutdown with queue drain on SIGTERM.
-
-**Addresses (from FEATURES.md):** Rate limiting per channel, simple deduplication (same message within N minutes = suppress), quiet hours, `jaimito list` / delivery status visibility, message queue drain on shutdown.
-
-**Avoids (from PITFALLS.md):** Notification flooding from loop bugs (per-channel rate limit + deduplication window), WAL file unbounded growth (periodic PRAGMA wal_checkpoint(PASSIVE), WAL size in health check), `wrap` failure storm suppression (N failures in M seconds = one summary message).
+### Phase 5: Cleanup + Polish
+**Rationale:** Puede integrarse al final una vez que el schema existe. Bajo riesgo, bajo esfuerzo. Cierra la operacion continua del sistema.
+**Delivers:** Purga de `metric_reads` en `cleanup/scheduler.go`; configuracion de ejemplo en `configs/config.example.yaml`; metricas Docker predefinidas (opcional, graceful si Docker no esta instalado)
 
 ### Phase Ordering Rationale
 
-- The HTTP server must exist before the CLI `send` command has an endpoint to call; the queue must exist before the dispatcher has rows to consume. The pipeline layers are strictly ordered by data flow.
-- Auth must ship with the ingest endpoint in Phase 1. A public HTTP endpoint without auth is not acceptable even during development on a VPS.
-- `jaimito wrap` (Phase 2) intentionally precedes rate limiting (Phase 3) in implementation order but should not be deployed to production cron jobs until Phase 3 is complete. The implementation is simple; the operational safety requires deduplication.
-- Observability features (`jaimito list`, WAL monitoring) land in Phase 3 because they require a stable production baseline to be meaningful. Adding monitoring before the monitored system is correct produces noisy data.
+- **Config + Schema primero** porque Go no compila si los tipos no existen y SQLite no tiene las tablas.
+- **Collector y API pueden desarrollarse en paralelo** una vez que Phase 1 esta completa — son independientes entre si y no comparten estado mutable fuera de la DB.
+- **Dashboard al final** porque es un consumidor puro de la API; desarrollarlo antes significaria mockar la API o esperar.
+- **Cleanup separado** porque no bloquea nada y puede integrarse en cualquier momento post-schema.
 
 ### Research Flags
 
-Phases likely needing deeper research during planning:
+Fases con patrones bien documentados (skip research-phase durante planning):
+- **Phase 1 (Config + Schema):** Extension de struct Go existente + SQL migration numerada. Patron establecido, el codebase ya lo hace con las migraciones anteriores.
+- **Phase 3 (REST API + CLI):** chi router extension + cobra subcommand. Patron establecido en el codebase existente.
+- **Phase 5 (Cleanup):** DELETE con WHERE sobre timestamp. Trivial, ya existe el scheduler.
 
-- **Phase 1 (SQLite connection pool):** The single-writer pattern with `modernc.org/sqlite` has nuances around DSN options and connection pool configuration (`_journal_mode`, `_busy_timeout`, `_foreign_keys`, `_synchronous`). Verify the exact DSN string and connection pool settings against the modernc.org/sqlite documentation before writing the database layer.
-- **Phase 1 (Telegram dispatcher):** Bot API 8.0 (November 2025) added the `adaptive_retry` field to 429 responses. Verify `go-telegram/bot` v1.19.0 surfaces this field, or implement raw response parsing for the 429 case.
+Fases que pueden necesitar micro-investigacion puntual durante planning:
+- **Phase 2 (Collector):** Verificar la API exacta de `gopsutil/v4` para cada metrica predefinida con pkg.go.dev antes de implementar. El pitfall M3 (process group kill) puede requerir verificacion en el entorno VPS especifico.
+- **Phase 4 (Dashboard):** La integracion uPlot + Alpine.js tiene opciones de API que conviene verificar con ejemplos actuales. El paso de Tailwind standalone CLI en el Makefile necesita establecerse correctamente antes de escribir HTML.
 
-Phases with standard patterns (skip research-phase):
-
-- **Phase 2 (CLI with cobra):** `spf13/cobra` is extremely well-documented; subcommand + flag patterns are standard. The credential lookup priority (env var -> config file -> prompt) is a known pattern. No additional research needed.
-- **Phase 3 (rate limiting):** A simple token bucket per channel using `time.Ticker` or `golang.org/x/time/rate` is a well-documented Go pattern. No novel research required.
+---
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | All library versions verified against pkg.go.dev as of 2026-02-20; Go 1.26 confirmed released 2026-02-10 |
-| Features | HIGH | Competitor analysis against ntfy official docs, Gotify GitHub, and Apprise; feature gaps verified against multiple practitioner sources |
-| Architecture | HIGH | Architecture is defined in the PRD (3-layer pipeline); validated against established patterns from ntfy, Gotify, and goqite reference implementation |
-| Pitfalls | MEDIUM-HIGH | SQLite and Go findings HIGH (multiple verified technical sources); Telegram API 8.0 `adaptive_retry` field MEDIUM (official docs confirmed via web search, not Context7) |
+| Stack | HIGH | Versiones verificadas contra pkg.go.dev y GitHub releases. gopsutil v4.26.2, uPlot v1.6.32, Alpine.js v3 son stable. Tamanios de bundle verificados con bundlephobia. |
+| Features | HIGH | Basado en analisis directo de Beszel, Netdata, Glances y patrones documentados de uso de operadores VPS. Anti-features estan fundamentadas con casos reales de alert fatigue. |
+| Architecture | HIGH | Basado en inspeccion directa del codebase existente. Las integraciones estan especificadas a nivel de linea de codigo con referencias a archivos concretos. |
+| Pitfalls | HIGH | M1-M4 son pitfalls de Go/SQLite con amplia documentacion y ejemplos de codigo verificados. M5-M8 son comportamientos documentados de la stdlib `embed`. |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Telegram `adaptive_retry` field (Bot API 8.0):** Confirmed present in the API but `go-telegram/bot` v1.19.0 typed error surface for `adaptive_retry` has not been verified. During Phase 1 dispatcher implementation, check whether `TooManyRequestsError` exposes this field or whether raw response parsing is needed.
-- **modernc.org/sqlite DSN options:** The exact DSN parameter names for WAL mode, foreign keys, and busy timeout with `modernc.org/sqlite` v1.46.1 may differ from `mattn/go-sqlite3`. Verify DSN format (`file:path?_journal_mode=WAL&_busy_timeout=5000&_foreign_keys=on`) against the modernc.org/sqlite documentation before writing the database initialization code.
-- **Priority behavioral differences:** Research confirmed that priority-as-behavior (not just cosmetic label) would be a differentiating feature. The MVP ships priority cosmetically. Whether to implement behavioral differentiation in Phase 1 or defer to Phase 3 should be resolved during requirements definition.
+- **API de gopsutil/v4 para Docker:** La investigacion menciona `docker.GetDockerStat()` pero la implementacion exacta para "running container count" debe verificarse con pkg.go.dev durante Phase 2. Si la API no cubre el caso, fallback a `exec.Command("docker", "ps", "--format", "json")`.
+- **Tailwind input.css:** El archivo fuente CSS de Tailwind para jaimito no existe aun y debe crearse antes del primer build del dashboard.
+- **Routing del dashboard:** La investigacion recomienda evitar URL-based SPA routing (Pitfall M7). La decision entre hash routing y single-path debe tomarse al inicio de Phase 4.
+- **Config file permissions en VPS de destino:** El enforcement de 0600 (Pitfall M1) debe validarse en el VPS real donde corre jaimito para confirmar que el usuario del servicio tiene los permisos adecuados.
+
+---
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- `pkg.go.dev/modernc.org/sqlite` — v1.46.1 verified; CGO-free; WAL support confirmed
-- `pkg.go.dev/github.com/go-telegram/bot` — v1.19.0; Bot API 9.4; typed 429 errors confirmed
-- `pkg.go.dev/github.com/go-chi/chi/v5` — v5.2.5; Go 1.22+ minimum; middleware grouping verified
-- `pkg.go.dev/github.com/spf13/cobra` — v1.10.2; yaml.v3 migration to go.yaml.in confirmed
-- `pkg.go.dev/github.com/pressly/goose/v3` — v3.26.0; WithSlog added; transaction-safe migrations
-- `go.dev/doc/devel/release` — Go 1.26 released 2026-02-10 confirmed
-- `docs.ntfy.sh` — ntfy feature set, publish API, config reference (official documentation)
-- `github.com/gotify/server` — Gotify feature set (official repository)
-- `sqlite.org/wal.html` — WAL mode concurrency characteristics (official SQLite docs)
-- `core.telegram.org/bots/faq` — Telegram rate limit behavior (official Telegram docs)
-- `blog.cloudflare.com` — Go net/http timeouts reference (authoritative Go networking)
-- `tenthousandmeters.com` — SQLite concurrent writes and SQLITE_BUSY (technical deep-dive with benchmarks)
-- `threedots.tech` — Durable background execution with Go and SQLite (established Go architecture blog)
+- Codebase jaimito — inspeccion directa de `serve.go`, `db/db.go`, `api/server.go`, `config/config.go`, `schema/*.sql`
+- `pkg.go.dev/github.com/shirou/gopsutil/v4` — v4.26.2, CGO-free confirmado
+- `github.com/leeoniya/uPlot` — v1.6.32, benchmarks de performance (Canvas vs Chart.js)
+- `pkg.go.dev/embed` — comportamiento documentado de go:embed (exclusion de `.`/`_`, rutas relativas sin `..`)
+- `bundlephobia.com/package/alpinejs` — 7.1KB gzipeado verificado
+- `tailwindcss.com/blog/standalone-cli` — CLI sin Node.js, comportamiento de purging
 
 ### Secondary (MEDIUM confidence)
-- `alexedwards.net/blog/which-go-router-should-i-use` — chi vs stdlib analysis 2025
-- `blog.vezpi.com/en/post/notification-system-gotify-vs-ntfy/` — competitor comparison
-- `core.telegram.org/bots/api` — Bot API 8.0 adaptive_retry field (web search confirmation)
-- `github.com/maragudk/goqite` — SQLite-backed queue reference implementation
-- `jacobgold.co/posts/go-sqlite-best-practices` — Go + SQLite best practices
-- `thomaswildetech.com/blog/2026/01/05/the-holy-grail-of-self-hosted-notifications/` — practitioner VPS notification pain points (Jan 2026)
-- `github.com/TelegramBotAPI/errors` — community-maintained Telegram error codes list
+- Beszel GitHub + beszel.dev — feature set y arquitectura hub+agent
+- Netdata, Glances, OpsDash — analisis comparativo de features y footprint
+- Smashing Magazine 2025 — patrones UX de dashboards de monitoreo en tiempo real
+- Alert fatigue post-mortems (Icinga, Datadog) — justificacion para transition-only alerts
+- Community discussions sobre Tailwind v4 standalone CLI output size (<10KB purged)
+
+### Tertiary (LOW confidence)
+- VPS Monitoring Guide 2026 (simpleobservability.com) — recomendaciones de thresholds; validar con el operador real
+- Dashboard layout patterns (datawirefra.me) — convenciones de layout; la implementacion especifica puede diferir
 
 ---
-*Research completed: 2026-02-21*
+*Research completed: 2026-03-26*
 *Ready for roadmap: yes*
