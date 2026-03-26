@@ -1,48 +1,49 @@
 ---
 gsd_state_version: 1.0
 milestone: v2.0
-milestone_name: Metricas y Dashboard
-status: In progress
-stopped_at: Completed 08-config-schema-y-crud-02-PLAN.md
-last_updated: "2026-03-26T16:18:00Z"
+milestone_name: Métricas y Dashboard
+status: Ready to plan
+stopped_at: Completed 08-config-schema-y-crud phase execution
+last_updated: "2026-03-26T16:23:44.332Z"
 progress:
-  total_phases: 5
-  completed_phases: 0
+  total_phases: 9
+  completed_phases: 5
   total_plans: 10
-  completed_plans: 2
+  completed_plans: 10
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-23)
+See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** Every event that happens on the VPS gets reliably captured and delivered to Telegram — no notification is ever lost silently.
 **Current focus:** Phase 08 — config-schema-y-crud
 
 ## Current Position
 
-Phase: 08
-Plan: 02 (complete)
+Phase: 9
+Plan: Not started
 
 ## Performance Metrics
 
-**Velocity:**
+**Velocity (v1.1 reference):**
 
-- Total plans completed: 0 (v1.1)
-- Average duration: — (sin datos v1.1)
-- Total execution time: —
+- Total plans completed: 10 (v1.0 + v1.1)
+- Average plans per phase: 2
+- Estimated plans v2.0: ~10 (2/phase x 5 phases)
 
-**By Phase:**
+**By Phase (v1.1 actual):**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 4. Wizard Scaffold | 0/2 | — | — |
+| 4. Wizard Scaffold | 2/2 | — | — |
+| 5. Validacion Telegram | 2/2 | — | — |
+| 6. Configuracion y Escritura | 2/2 | — | — |
+| 7. Verificacion e Integracion | 2/2 | — | — |
 
-**Recent Trend:**
-
-- Sin datos v1.1 todavia
+**Recent Trend (v1.1 raw data):**
 
 | Phase 04-wizard-scaffold P01 | 8 | 1 tasks | 8 files |
 | Phase 04-wizard-scaffold P02 | 4 | 1 tasks | 4 files |
@@ -50,45 +51,45 @@ Plan: 02 (complete)
 | Phase 05 P02 | 5 | 2 tasks | 5 files |
 | Phase 06 P01 | 6 | 2 tasks | 11 files |
 | Phase 06 P02 | 5 | 1 tasks | 3 files |
-| Phase 07-verificacion-e-integracion P01 | 15 | 1 tasks | 2 files |
-| Phase 07-verificacion-e-integracion P02 | 15 | 2 tasks | 1 files |
-| Phase 08-config-schema-y-crud P02 | 132 | 2 tasks | 4 files |
+| Phase 07 P01 | 15 | 1 tasks | 2 files |
+| Phase 07 P02 | 15 | 2 tasks | 1 files |
+| Phase 08 P01 | 12 | 2 tasks | 3 files |
+| Phase 08 P02 | 132 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
 ### Decisions
 
 Decisions are logged in PROJECT.md Key Decisions table.
-Decisiones relevantes para v1.1:
 
-- Nuevas dependencias: bubbletea v2, bubbles v2, lipgloss v2, golang.org/x/term
-- Dos modificaciones internas necesarias: `telegram.ValidateTokenWithInfo()` y `db.GenerateRawKey()`
-- Wizard usa maquina de estados lineal con 12 estados internos y 7 steps visibles
-- install.sh usa redireccion `/dev/tty` para compatibilidad con `curl | bash`
-- [Phase 04-01]: Step interface simple (no tea.Model anidados) para evitar complejidad de message-passing entre steps del wizard
-- [Phase 04-01]: renderSidebar prioriza step activo sobre completedMap para navegacion correcta hacia atras con Esc
-- [Phase 04-01]: .gitignore: patron /jaimito (con slash) en vez de jaimito para no ignorar el directorio cmd/jaimito/
-- [Phase 04-02]: sidebarOffset en WizardModel para steps internos (DetectConfigStep) sin afectar sidebar de 7 steps visibles
-- [Phase 04-02]: ConfigExists bool en SetupData separa deteccion del archivo de la validacion del contenido
-- [Phase 05-validacion-telegram]: Test helpers exportados en BotTokenStep (SetValidationState, NewTokenValidationResultMsg) para testear async desde package externo sin exponer campos internos
-- [Phase 05-validacion-telegram]: Patron async establecido: tokenValidationResultMsg + seq number anti-stale + spinner.TickMsg + validateTokenCmd con 10s timeout y panic recovery
-- [Phase 05]: chatValidationResultMsg definido en general_channel_step.go, reutilizado por ExtraChannelsStep sin redefinicion (mismo package)
-- [Phase 05]: ExtraChannelsStep maquina de 6 estados (askAdd/inputName/inputChatID/selectPriority/validating/confirmMore) para loop de canales extras
-- [Phase 05]: Canales extra se acumulan internamente y se committean a data.Channels solo al confirmar No final
-- [Phase 06]: GenerateRawKey() es funcion pura en db package — reutilizable desde wizard sin acceso a DB
-- [Phase 06]: View() muestra defaultValue como texto plano ademas del placeholder del textinput — testeable sin ANSI parsing
-- [Phase 06]: WarningStyle agregado a styles.go como variable global — consistente con patron del paquete
-- [Phase 06]: SummaryStep: writeConfig retorna errores con prefix 'validacion:' para distinguir de errores de escritura en Update()
-- [Phase 06]: SummaryStep: tea.Quit retornado directamente en Update() al confirmar escritura exitosa — wizard termina limpiamente
-- [Phase 07-01]: Sin seq number en testNotificationResultMsg: la notificacion se dispara exactamente una vez
-- [Phase 07-01]: Fallo de notificacion de test es warning amarillo no error rojo - no bloquea el flujo del operador
-- [Phase 07-verificacion-e-integracion]: install.sh usa sudo ${BINARY_DEST} setup < /dev/tty para compatibilidad curl|bash con wizard interactivo (INST-01)
+**Decisiones heredadas de v1.0/v1.1 relevantes para v2.0:**
+
+- Single-writer SQLite pool (SetMaxOpenConns(1)) — suficiente y correcto; no abrir segunda conexion para el dashboard
+- chi v5 para HTTP — el dashboard y la API de metricas se registran como rutas adicionales en el router existente
+- modernc.org/sqlite (CGO-free) — sin cambio; migracion numerada `003_metrics.sql` sigue el patron existente
+- cobra para CLI — `jaimito metric` y `jaimito status` son nuevos subcomandos cobras
+- Dispatcher existente sin cambios — alertas de umbral se enolan via `db.EnqueueMessage()` existente
+
+**Decisiones de arquitectura v2.0 (de investigacion):**
+
+- gopsutil/v4 para metricas predefinidas (CGO-free, amd64+arm64)
+- Alpine.js v3 + uPlot v1.6.32 + Tailwind CSS pre-compilado embedidos via go:embed
+- Tailwind debe pre-compilarse con CLI standalone antes de `go build` — NO usar Play CDN
+- exec.CommandContext con timeout = min(80% del intervalo, 30s) + cmd.WaitDelay = 5s
+- Patron collect-then-write: ejecutar comando fuera de transaccion, luego INSERT inmediato
+- go:embed requiere rutas relativas al archivo que contiene la directiva — embed.go en internal/web/
+- Alert state machine (ok/warning/critical) desde el inicio — no retrofittable
+- Cooldown configurable (default 30 minutos) con estado persistido en memoria (no en DB)
+- [Phase 08]: MetricsConfig uses pointer (*MetricsConfig) so configs without metrics section parse to nil — backward compatible with v1.0/v1.1 configs (D-04)
+- [Phase 08]: parseDuration not exported; ParseDuration (uppercase) exported for Phase 9+ use
 - [Phase 08-02]: strftime RFC3339 en tablas de metricas en vez de datetime('now') — habilita queries de rango con time.RFC3339 desde Go
 - [Phase 08-02]: QueryReadings y ListMetrics retornan slice vacio (no nil) — contrato consistente para callers
 
 ### Pending Todos
 
-None.
+- [ ] Precompilar Tailwind CSS antes de Phase 11 — requiere Tailwind CLI standalone instalado localmente
+- [ ] Verificar API exacta de gopsutil/v4 para docker running container count antes de Phase 9
+- [ ] Definir routing del dashboard (hash vs single-path) al inicio de Phase 11
 
 ### Blockers/Concerns
 
@@ -96,6 +97,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-26T16:18:00Z
-Stopped at: Completed 08-config-schema-y-crud-02-PLAN.md
+Last session: 2026-03-26T16:20:00Z
+Stopped at: Completed 08-config-schema-y-crud phase execution
 Resume file: None

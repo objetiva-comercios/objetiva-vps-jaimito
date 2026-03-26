@@ -3,9 +3,7 @@
 **Defined:** 2026-03-24
 **Core Value:** Every event that happens on the VPS gets reliably captured and delivered to Telegram — no notification is ever lost silently.
 
-## v1.1 Requirements
-
-Requirements for the Setup Wizard milestone. Each maps to roadmap phases.
+## v1.1 Requirements (Complete)
 
 ### Wizard TUI
 
@@ -34,6 +32,51 @@ Requirements for the Setup Wizard milestone. Each maps to roadmap phases.
 
 - [x] **INST-01**: `install.sh` invoca `jaimito setup` automáticamente cuando no existe config (con `< /dev/tty`)
 
+## v2.0 Requirements
+
+Requirements for Métricas y Dashboard milestone. Each maps to roadmap phases.
+
+### Metrics Collection
+
+- [ ] **MCOL-01**: Jaimito ejecuta comandos shell a intervalos configurables para recolectar métricas del sistema
+- [ ] **MCOL-02**: Métricas predefinidas incluidas: disk_root (%), ram_used (%), cpu_load, docker_running, uptime_days
+- [x] **MCOL-03**: El usuario puede definir métricas custom en config.yaml con nombre, categoría, comando, intervalo y tipo
+- [ ] **MCOL-04**: Cada comando se ejecuta con timeout de 10 segundos (exec.CommandContext + WaitDelay)
+- [ ] **MCOL-05**: Si un comando falla, se registra en logs sin afectar las demás métricas
+
+### Storage
+
+- [ ] **STOR-01**: Los readings se almacenan en tabla metric_readings (SQLite) con metric_name, value, recorded_at
+- [ ] **STOR-02**: Purga automática de readings mayores a 7 días (reutiliza patrón de cleanup existente)
+- [x] **STOR-03**: La sección metrics en config.yaml define retention y alert_cooldown globales
+
+### Dashboard
+
+- [ ] **DASH-01**: Dashboard web accesible en GET /dashboard servido desde archivos embedidos (go:embed)
+- [ ] **DASH-02**: Vista principal: tabla con todas las métricas (nombre, valor actual, sparkline de tendencia, indicador de estado)
+- [ ] **DASH-03**: Click en una fila expande un gráfico temporal (uPlot) con historial de esa métrica
+- [ ] **DASH-04**: Auto-refresh cada 30 segundos sin recargar la página (Alpine.js polling)
+- [ ] **DASH-05**: Frontend usa Tailwind CSS pre-compilado, Lucide icons inline SVG, Alpine.js, uPlot
+- [ ] **DASH-06**: El dashboard muestra hostname del VPS y timestamp de última actualización
+
+### Alerting
+
+- [x] **ALRT-01**: Cada métrica define umbrales warning y critical en config.yaml
+- [ ] **ALRT-02**: Cuando una métrica cruza un umbral, jaimito envía alerta a Telegram via el dispatcher existente
+- [ ] **ALRT-03**: State machine por métrica (ok→warning→critical): alerta solo en transición de nivel, no en cada poll
+- [ ] **ALRT-04**: Cooldown configurable (default 30 minutos) para evitar alert storms
+
+### CLI
+
+- [ ] **CLI-01**: `jaimito metric -n name --value X` envía una métrica manual via POST /api/v1/metrics
+- [ ] **CLI-02**: `jaimito status` muestra las métricas actuales en formato tabla (consulta GET /api/v1/metrics)
+
+### API
+
+- [ ] **API-01**: GET /api/v1/metrics retorna lista de métricas con último valor, config y estado (sin auth)
+- [ ] **API-02**: GET /api/v1/metrics/{name}/readings retorna historial con query param ?since=2h|24h|7d (sin auth)
+- [ ] **API-03**: POST /api/v1/metrics permite ingestar readings manuales (con Bearer auth)
+
 ## Future Requirements
 
 Deferred to future milestones. Tracked but not in current roadmap.
@@ -60,12 +103,14 @@ Explicitly excluded. Documented to prevent scope creep.
 | Feature | Reason |
 |---------|--------|
 | Email/SMTP dispatcher | Apprise covers this; out of jaimito's scope |
-| Web dashboard | Telegram IS the history; a dashboard is a product pivot |
 | Multi-user support | Single-VPS model is a feature, not a bug |
 | Plugin system | Maintenance burden exceeds value at this scale |
 | WhatsApp/PagerDuty/Matrix | Deferred to v2+; recommend Apprise bridge |
 | Message grouping/digest | Deferred to future milestone |
 | Wizard web UI | CLI-only; keep single-binary principle |
+| WebSocket real-time | Polling cada 30s satisface el caso de uso; WebSocket agrega complejidad sin beneficio |
+| Prometheus exporter | Jaimito es autocontenido; exportar a Prometheus contradice el propósito |
+| Centralización multi-VPS | Cada VPS tiene su propio dashboard; centralizar es v3+ |
 
 ## Traceability
 
@@ -85,12 +130,36 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONF-04 | Phase 6 | Complete |
 | TEST-01 | Phase 7 | Complete |
 | INST-01 | Phase 7 | Complete |
+| MCOL-01 | Phase 9 | Pending |
+| MCOL-02 | Phase 9 | Pending |
+| MCOL-03 | Phase 8 | Complete |
+| MCOL-04 | Phase 9 | Pending |
+| MCOL-05 | Phase 9 | Pending |
+| STOR-01 | Phase 8 | Pending |
+| STOR-02 | Phase 12 | Pending |
+| STOR-03 | Phase 8 | Complete |
+| DASH-01 | Phase 11 | Pending |
+| DASH-02 | Phase 11 | Pending |
+| DASH-03 | Phase 11 | Pending |
+| DASH-04 | Phase 11 | Pending |
+| DASH-05 | Phase 11 | Pending |
+| DASH-06 | Phase 11 | Pending |
+| ALRT-01 | Phase 8 | Complete |
+| ALRT-02 | Phase 9 | Pending |
+| ALRT-03 | Phase 9 | Pending |
+| ALRT-04 | Phase 9 | Pending |
+| CLI-01 | Phase 10 | Pending |
+| CLI-02 | Phase 10 | Pending |
+| API-01 | Phase 10 | Pending |
+| API-02 | Phase 10 | Pending |
+| API-03 | Phase 10 | Pending |
 
 **Coverage:**
-- v1.1 requirements: 12 total
-- Mapped to phases: 12
+- v1.1 requirements: 12 total (all complete)
+- v2.0 requirements: 23 total (all pending)
+- Mapped to phases: 35 total (12 v1.1 + 23 v2.0)
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-24*
-*Last updated: 2026-03-24 after roadmap creation*
+*Last updated: 2026-03-26 — v2.0 traceability mapped to Phases 8-12*

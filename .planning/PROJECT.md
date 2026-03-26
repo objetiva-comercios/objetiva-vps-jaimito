@@ -32,18 +32,20 @@ Every event that happens on the VPS gets reliably captured and delivered to Tele
 - ✓ Test notification to prove setup works before finishing — Validated in Phase 7: Verificacion e Integracion
 - ✓ install.sh integration (replaces manual config.example.yaml copy) — Validated in Phase 7: Verificacion e Integracion
 
-## Current Milestone: v1.1 Setup Wizard
+## Current Milestone: v2.0 Métricas y Dashboard
 
-**Goal:** Eliminate the manual config.yaml editing barrier with an interactive CLI wizard that guides users through setup, validates everything live, and sends a test notification.
+**Goal:** Extender jaimito para recolectar métricas del sistema, almacenarlas, y mostrarlas en un dashboard web embedido — monitoreo liviano sin instalar Prometheus/Grafana.
 
 **Target features:**
-- `jaimito setup` cobra subcommand with bubbletea TUI
-- Step-by-step wizard: bot token → channels → server → db → API key → summary
-- Live Telegram API validation (bot token, chat IDs)
-- Auto-generated API key with `db.GenerateRawKey()`
-- Config YAML generation and writing with proper permissions
-- Test notification via bot API
-- install.sh integration with `/dev/tty` redirect for `curl | bash`
+- Recolector interno de métricas (disco, RAM, CPU, Docker, custom) con ejecución por intervalos
+- Definición de métricas en config.yaml con comandos, intervalos, umbrales y tipos
+- Métricas predefinidas (disk_root, ram_used, cpu_load, docker_running, uptime_days)
+- Dashboard web embedido (go:embed) con tabla de métricas + gráfico expandible
+- Alertas automáticas a Telegram cuando una métrica cruza un umbral (warning/critical)
+- CLI `jaimito metric` para ingesta manual de métricas
+- CLI `jaimito status` para ver métricas actuales
+- API REST para métricas (GET /api/v1/metrics, GET /api/v1/metrics/{name}/readings)
+- Retención de 7 días con purga automática
 
 ### Out of Scope
 
@@ -51,22 +53,25 @@ Every event that happens on the VPS gets reliably captured and delivered to Tele
 - HTTP generic/cURL dispatcher — deferred to future milestone
 - File watcher ingestor — deferred to future milestone
 - Systemd watcher — deferred to v2+
-- Dashboard web — anti-feature: Telegram IS the history
+- Dashboard web — ~~anti-feature~~ → promoted to v2.0 milestone (métricas + dashboard)
 - Message grouping/digest — deferred to future milestone
 - Deduplication — deferred to future milestone
 - Rate limiting — deferred to future milestone
 - Quiet hours — deferred to future milestone
-- Query API (list messages, stats) — deferred to future milestone
+- Query API (list messages, stats) — partially addressed in v2.0 (metrics API)
 - WhatsApp/PagerDuty/Matrix dispatchers — deferred to v2+
 
 ## Context
 
 - Shipped v1.0 MVP with 2,090 LOC Go across 62 files
-- Tech stack: Go 1.24, modernc.org/sqlite (CGO-free), chi v5, cobra, go-telegram/bot
+- v1.1 Setup Wizard shipped — interactive TUI config wizard with live Telegram validation
+- Tech stack: Go 1.25, modernc.org/sqlite (CGO-free), chi v5, cobra, go-telegram/bot, bubbletea v2
 - Runs on the same VPS it monitors (single machine deployment)
 - Primary pain point solved: cron jobs no longer fail silently (`jaimito wrap`)
 - Single binary, zero external dependencies, ~50MB memory footprint
-- 16 unit tests passing
+- v2.0 adds: Tailwind CSS, Lucide icons, Alpine.js (~15KB), uPlot (~14KB) — all embedido via go:embed
+- Dashboard sin auth (localhost only, acceso via Tailscale)
+- Métricas como comandos shell ejecutados por jaimito con intervalos configurables
 
 ## Constraints
 
@@ -93,5 +98,22 @@ Every event that happens on the VPS gets reliably captured and delivered to Tele
 | Single-writer SQLite pool | SetMaxOpenConns(1) prevents SQLITE_BUSY in WAL mode | ✓ Good — no concurrency issues |
 | API/dispatcher separation | API enqueues to DB, dispatcher reads independently | ✓ Good — clean boundary, testable |
 
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd:transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd:complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
+
 ---
-*Last updated: 2026-03-25 after Phase 7 (Verificacion e Integracion) complete — v1.1 Setup Wizard milestone complete. Wizard envia notificacion de test a Telegram, install.sh invoca wizard automaticamente.*
+*Last updated: 2026-03-26 — Milestone v2.0 Métricas y Dashboard started.*

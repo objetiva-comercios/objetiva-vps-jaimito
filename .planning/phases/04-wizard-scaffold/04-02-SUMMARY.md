@@ -76,7 +76,7 @@ completed: 2026-03-25
 
 1. **Task 1: DetectConfigStep con tres ramas + backup + pre-llenado** - `e747a24` (feat)
 
-**Plan metadata:** pendiente (commit final de docs)
+**Plan metadata:** `494769e` (docs: complete detect-config-step plan)
 
 ## Files Created/Modified
 
@@ -116,3 +116,12 @@ None - no external service configuration required.
 ---
 *Phase: 04-wizard-scaffold*
 *Completed: 2026-03-25*
+
+## Self-Check: PASSED
+
+- detect_config_test.go: FOUND
+- steps.go: FOUND
+- SUMMARY.md: FOUND
+- Commit e747a24 (task): FOUND
+- Commit 494769e (docs): FOUND
+- go test ./cmd/jaimito/setup/...: PASS (14 tests)
