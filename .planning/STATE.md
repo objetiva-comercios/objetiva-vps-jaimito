@@ -1,15 +1,15 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: Setup Wizard
-status: Milestone complete
-stopped_at: Completed 07-verificacion-e-integracion-02-PLAN.md
-last_updated: "2026-03-25T18:15:27.107Z"
+milestone: v2.0
+milestone_name: Metricas y Dashboard
+status: In progress
+stopped_at: Completed 08-config-schema-y-crud-02-PLAN.md
+last_updated: "2026-03-26T16:18:00Z"
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 8
-  completed_plans: 8
+  total_phases: 5
+  completed_phases: 0
+  total_plans: 10
+  completed_plans: 2
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-23)
 
 **Core value:** Every event that happens on the VPS gets reliably captured and delivered to Telegram — no notification is ever lost silently.
-**Current focus:** Phase 07 — verificacion-e-integracion
+**Current focus:** Phase 08 — config-schema-y-crud
 
 ## Current Position
 
-Phase: 07
-Plan: Not started
+Phase: 08
+Plan: 02 (complete)
 
 ## Performance Metrics
 
@@ -52,6 +52,7 @@ Plan: Not started
 | Phase 06 P02 | 5 | 1 tasks | 3 files |
 | Phase 07-verificacion-e-integracion P01 | 15 | 1 tasks | 2 files |
 | Phase 07-verificacion-e-integracion P02 | 15 | 2 tasks | 1 files |
+| Phase 08-config-schema-y-crud P02 | 132 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -82,6 +83,8 @@ Decisiones relevantes para v1.1:
 - [Phase 07-01]: Sin seq number en testNotificationResultMsg: la notificacion se dispara exactamente una vez
 - [Phase 07-01]: Fallo de notificacion de test es warning amarillo no error rojo - no bloquea el flujo del operador
 - [Phase 07-verificacion-e-integracion]: install.sh usa sudo ${BINARY_DEST} setup < /dev/tty para compatibilidad curl|bash con wizard interactivo (INST-01)
+- [Phase 08-02]: strftime RFC3339 en tablas de metricas en vez de datetime('now') — habilita queries de rango con time.RFC3339 desde Go
+- [Phase 08-02]: QueryReadings y ListMetrics retornan slice vacio (no nil) — contrato consistente para callers
 
 ### Pending Todos
 
@@ -93,6 +96,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-25T16:11:36.287Z
-Stopped at: Completed 07-verificacion-e-integracion-02-PLAN.md
+Last session: 2026-03-26T16:18:00Z
+Stopped at: Completed 08-config-schema-y-crud-02-PLAN.md
 Resume file: None
