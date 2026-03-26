@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func writeTempConfig(t *testing.T, content string) string {
@@ -332,5 +333,344 @@ seed_api_keys:
 	_, err := Load(path)
 	if err == nil {
 		t.Fatal("expected error for key missing sk- prefix, got nil")
+	}
+}
+
+// --- parseDuration tests ---
+
+func TestParseDuration_ValidSeconds(t *testing.T) {
+	d, err := parseDuration("300s")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if d != 5*time.Minute {
+		t.Errorf("expected 5m, got %v", d)
+	}
+}
+
+func TestParseDuration_ValidMinutes(t *testing.T) {
+	d, err := parseDuration("30m")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if d != 30*time.Minute {
+		t.Errorf("expected 30m, got %v", d)
+	}
+}
+
+func TestParseDuration_ValidDays(t *testing.T) {
+	d, err := parseDuration("7d")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if d != 7*24*time.Hour {
+		t.Errorf("expected 168h, got %v", d)
+	}
+}
+
+func TestParseDuration_InvalidDays(t *testing.T) {
+	_, err := parseDuration("0d")
+	if err == nil {
+		t.Fatal("expected error for 0d, got nil")
+	}
+	if !containsStr(err.Error(), "positive integer") {
+		t.Errorf("expected 'positive integer' in error, got: %v", err)
+	}
+}
+
+func TestParseDuration_InvalidFormat(t *testing.T) {
+	_, err := parseDuration("abc")
+	if err == nil {
+		t.Fatal("expected error for 'abc', got nil")
+	}
+	if !containsStr(err.Error(), "invalid duration") {
+		t.Errorf("expected 'invalid duration' in error, got: %v", err)
+	}
+}
+
+func TestParseDuration_EmptyString(t *testing.T) {
+	_, err := parseDuration("")
+	if err == nil {
+		t.Fatal("expected error for empty string, got nil")
+	}
+}
+
+// containsStr is a helper to check substring presence without importing strings in test.
+func containsStr(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsSubstr(s, substr))
+}
+
+func containsSubstr(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
+// --- MetricsConfig load tests ---
+
+func TestLoad_WithMetrics(t *testing.T) {
+	content := `
+telegram:
+  token: "test-token"
+channels:
+  - name: general
+    chat_id: 12345
+    priority: normal
+metrics:
+  retention: "7d"
+  alert_cooldown: "30m"
+  collect_interval: "60s"
+  definitions:
+    - name: disk_root
+      command: "df / | awk 'NR==2 {print $5}' | tr -d '%'"
+      interval: "300s"
+      category: system
+      type: gauge
+      thresholds:
+        warning: 80
+        critical: 90
+`
+	path := writeTempConfig(t, content)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if cfg.Metrics == nil {
+		t.Fatal("expected cfg.Metrics to be non-nil")
+	}
+	if len(cfg.Metrics.Definitions) != 1 {
+		t.Errorf("expected 1 definition, got %d", len(cfg.Metrics.Definitions))
+	}
+}
+
+func TestLoad_WithoutMetrics(t *testing.T) {
+	content := `
+telegram:
+  token: "test-token"
+channels:
+  - name: general
+    chat_id: 12345
+    priority: normal
+`
+	path := writeTempConfig(t, content)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if cfg.Metrics != nil {
+		t.Fatal("expected cfg.Metrics to be nil when not specified")
+	}
+}
+
+// --- MetricsConfig validation tests ---
+
+func TestValidateMetrics_DuplicateName(t *testing.T) {
+	content := `
+telegram:
+  token: "test-token"
+channels:
+  - name: general
+    chat_id: 12345
+    priority: normal
+metrics:
+  retention: "7d"
+  alert_cooldown: "30m"
+  collect_interval: "60s"
+  definitions:
+    - name: disk_root
+      command: "df /"
+    - name: disk_root
+      command: "df /tmp"
+`
+	path := writeTempConfig(t, content)
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("expected error for duplicate name, got nil")
+	}
+	if !containsStr(err.Error(), "duplicate name") {
+		t.Errorf("expected 'duplicate name' in error, got: %v", err)
+	}
+}
+
+func TestValidateMetrics_EmptyCommand(t *testing.T) {
+	content := `
+telegram:
+  token: "test-token"
+channels:
+  - name: general
+    chat_id: 12345
+    priority: normal
+metrics:
+  retention: "7d"
+  alert_cooldown: "30m"
+  collect_interval: "60s"
+  definitions:
+    - name: disk_root
+      command: ""
+`
+	path := writeTempConfig(t, content)
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("expected error for empty command, got nil")
+	}
+	if !containsStr(err.Error(), "command must not be empty") {
+		t.Errorf("expected 'command must not be empty' in error, got: %v", err)
+	}
+}
+
+func TestValidateMetrics_EmptyName(t *testing.T) {
+	content := `
+telegram:
+  token: "test-token"
+channels:
+  - name: general
+    chat_id: 12345
+    priority: normal
+metrics:
+  retention: "7d"
+  alert_cooldown: "30m"
+  collect_interval: "60s"
+  definitions:
+    - name: ""
+      command: "df /"
+`
+	path := writeTempConfig(t, content)
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("expected error for empty name, got nil")
+	}
+	if !containsStr(err.Error(), "name must not be empty") {
+		t.Errorf("expected 'name must not be empty' in error, got: %v", err)
+	}
+}
+
+func TestValidateMetrics_ThresholdsWarningGtCritical(t *testing.T) {
+	content := `
+telegram:
+  token: "test-token"
+channels:
+  - name: general
+    chat_id: 12345
+    priority: normal
+metrics:
+  retention: "7d"
+  alert_cooldown: "30m"
+  collect_interval: "60s"
+  definitions:
+    - name: disk_root
+      command: "df /"
+      thresholds:
+        warning: 90
+        critical: 80
+`
+	path := writeTempConfig(t, content)
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("expected error for warning >= critical, got nil")
+	}
+	if !containsStr(err.Error(), "warning must be < critical") {
+		t.Errorf("expected 'warning must be < critical' in error, got: %v", err)
+	}
+}
+
+func TestValidateMetrics_ThresholdsValid(t *testing.T) {
+	content := `
+telegram:
+  token: "test-token"
+channels:
+  - name: general
+    chat_id: 12345
+    priority: normal
+metrics:
+  retention: "7d"
+  alert_cooldown: "30m"
+  collect_interval: "60s"
+  definitions:
+    - name: disk_root
+      command: "df /"
+      thresholds:
+        warning: 80
+        critical: 90
+`
+	path := writeTempConfig(t, content)
+	_, err := Load(path)
+	if err != nil {
+		t.Fatalf("expected no error for valid thresholds, got: %v", err)
+	}
+}
+
+func TestValidateMetrics_NoThresholds(t *testing.T) {
+	content := `
+telegram:
+  token: "test-token"
+channels:
+  - name: general
+    chat_id: 12345
+    priority: normal
+metrics:
+  retention: "7d"
+  alert_cooldown: "30m"
+  collect_interval: "60s"
+  definitions:
+    - name: cpu_load
+      command: "uptime"
+`
+	path := writeTempConfig(t, content)
+	_, err := Load(path)
+	if err != nil {
+		t.Fatalf("expected no error for metric without thresholds, got: %v", err)
+	}
+}
+
+func TestValidateMetrics_DefaultCategory(t *testing.T) {
+	content := `
+telegram:
+  token: "test-token"
+channels:
+  - name: general
+    chat_id: 12345
+    priority: normal
+metrics:
+  retention: "7d"
+  alert_cooldown: "30m"
+  collect_interval: "60s"
+  definitions:
+    - name: cpu_load
+      command: "uptime"
+`
+	path := writeTempConfig(t, content)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	// Category="" is valid — default "custom" is applied in runtime, not in unmarshal (D-12)
+	if cfg.Metrics.Definitions[0].Category != "" {
+		t.Errorf("expected empty Category (runtime default), got %q", cfg.Metrics.Definitions[0].Category)
+	}
+}
+
+func TestValidateMetrics_InheritInterval(t *testing.T) {
+	content := `
+telegram:
+  token: "test-token"
+channels:
+  - name: general
+    chat_id: 12345
+    priority: normal
+metrics:
+  retention: "7d"
+  alert_cooldown: "30m"
+  collect_interval: "60s"
+  definitions:
+    - name: cpu_load
+      command: "uptime"
+`
+	path := writeTempConfig(t, content)
+	_, err := Load(path)
+	if err != nil {
+		t.Fatalf("expected no error for definition without interval, got: %v", err)
 	}
 }
