@@ -117,6 +117,18 @@ None — plan ejecutado exitosamente siguiendo el spec exacto.
 - Plan 02 puede implementar la state machine de alertas sobre la base de este collector
 - Todos los contratos de DB (UpsertMetric, InsertReading, UpdateMetricStatus) correctamente usados
 
+## Self-Check: PASSED
+
+- FOUND: internal/collector/runner.go
+- FOUND: internal/collector/collector.go
+- FOUND: internal/collector/collector_test.go
+- FOUND: .planning/phases/09-metrics-collector-y-alertas/09-01-SUMMARY.md
+- FOUND: commit a8ec4a1 (test RED runner)
+- FOUND: commit de95805 (feat GREEN runner)
+- FOUND: commit 5f9074c (test RED collector)
+- FOUND: commit 5f33e0e (feat GREEN collector)
+- FOUND: commit 3bfb2be (docs final)
+
 ---
 *Phase: 09-metrics-collector-y-alertas*
 *Completed: 2026-03-27*
