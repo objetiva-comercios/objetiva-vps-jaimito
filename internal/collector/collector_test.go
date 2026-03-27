@@ -3,6 +3,7 @@ package collector
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"testing"
 	"time"
 
@@ -253,5 +254,202 @@ func TestCollectCommandFailure(t *testing.T) {
 	}
 	if len(readings) != 0 {
 		t.Errorf("expected 0 readings after command failure, got %d", len(readings))
+	}
+}
+
+// ptr es un helper para obtener un puntero a un float64.
+func ptr(f float64) *float64 { return &f }
+
+// --- evaluator.go tests ---
+
+// TestEvaluateLevel_NoThresholds: thresholds nil -> "ok" para cualquier valor.
+func TestEvaluateLevel_NoThresholds(t *testing.T) {
+	got := evaluateLevel(85.0, nil)
+	if got != "ok" {
+		t.Errorf("expected 'ok', got %q", got)
+	}
+}
+
+// TestEvaluateLevel_Warning: value=85, warning=80, critical=90 -> "warning".
+func TestEvaluateLevel_Warning(t *testing.T) {
+	th := &config.Thresholds{Warning: ptr(80.0), Critical: ptr(90.0)}
+	got := evaluateLevel(85.0, th)
+	if got != "warning" {
+		t.Errorf("expected 'warning', got %q", got)
+	}
+}
+
+// TestEvaluateLevel_Critical: value=95, warning=80, critical=90 -> "critical".
+func TestEvaluateLevel_Critical(t *testing.T) {
+	th := &config.Thresholds{Warning: ptr(80.0), Critical: ptr(90.0)}
+	got := evaluateLevel(95.0, th)
+	if got != "critical" {
+		t.Errorf("expected 'critical', got %q", got)
+	}
+}
+
+// TestEvaluateLevel_Ok: value=50, warning=80, critical=90 -> "ok".
+func TestEvaluateLevel_Ok(t *testing.T) {
+	th := &config.Thresholds{Warning: ptr(80.0), Critical: ptr(90.0)}
+	got := evaluateLevel(50.0, th)
+	if got != "ok" {
+		t.Errorf("expected 'ok', got %q", got)
+	}
+}
+
+// TestEvaluateLevel_OnlyWarning: warning=80, critical nil, value=85 -> "warning".
+func TestEvaluateLevel_OnlyWarning(t *testing.T) {
+	th := &config.Thresholds{Warning: ptr(80.0), Critical: nil}
+	got := evaluateLevel(85.0, th)
+	if got != "warning" {
+		t.Errorf("expected 'warning', got %q", got)
+	}
+}
+
+// TestShouldAlert_FirstTransition: state ok, newLevel warning -> true.
+func TestShouldAlert_FirstTransition(t *testing.T) {
+	s := &metricState{currentLevel: "ok"}
+	if !s.shouldAlert("warning", 30*time.Minute) {
+		t.Error("expected shouldAlert=true for ok->warning transition")
+	}
+}
+
+// TestShouldAlert_SameLevel: state warning, newLevel warning -> false.
+func TestShouldAlert_SameLevel(t *testing.T) {
+	s := &metricState{currentLevel: "warning"}
+	if s.shouldAlert("warning", 30*time.Minute) {
+		t.Error("expected shouldAlert=false for warning->warning (same level)")
+	}
+}
+
+// TestShouldAlert_Escalation: state warning, newLevel critical -> true.
+func TestShouldAlert_Escalation(t *testing.T) {
+	s := &metricState{currentLevel: "warning", lastAlert: time.Now().Add(-35 * time.Minute)}
+	if !s.shouldAlert("critical", 30*time.Minute) {
+		t.Error("expected shouldAlert=true for warning->critical escalation")
+	}
+}
+
+// TestShouldAlert_Recovery: state critical, newLevel ok -> true (recovery alert).
+func TestShouldAlert_Recovery(t *testing.T) {
+	s := &metricState{currentLevel: "critical", lastAlert: time.Now().Add(-1 * time.Hour)}
+	if !s.shouldAlert("ok", 30*time.Minute) {
+		t.Error("expected shouldAlert=true for critical->ok recovery")
+	}
+}
+
+// TestShouldAlert_CooldownBlocks: state ok, newLevel warning, lastAlert 5min ago, cooldown 30min -> false.
+func TestShouldAlert_CooldownBlocks(t *testing.T) {
+	s := &metricState{currentLevel: "ok", lastAlert: time.Now().Add(-5 * time.Minute)}
+	if s.shouldAlert("warning", 30*time.Minute) {
+		t.Error("expected shouldAlert=false: within cooldown window")
+	}
+}
+
+// TestShouldAlert_CooldownExpired: state ok, newLevel warning, lastAlert 31min ago, cooldown 30min -> true.
+func TestShouldAlert_CooldownExpired(t *testing.T) {
+	s := &metricState{currentLevel: "ok", lastAlert: time.Now().Add(-31 * time.Minute)}
+	if !s.shouldAlert("warning", 30*time.Minute) {
+		t.Error("expected shouldAlert=true: cooldown expired")
+	}
+}
+
+// TestHydrateStates: ListMetrics retorna MetricRow con LastStatus="warning" -> state.currentLevel=="warning".
+func TestHydrateStates(t *testing.T) {
+	ctx := context.Background()
+	database := newTestDB(t)
+
+	// Insertar metrica con status warning en la DB
+	if err := db.UpsertMetric(ctx, database, "cpu_usage", "system", "gauge"); err != nil {
+		t.Fatalf("upsert metric: %v", err)
+	}
+	if err := db.UpdateMetricStatus(ctx, database, "cpu_usage", 85.0, "warning"); err != nil {
+		t.Fatalf("update metric status: %v", err)
+	}
+
+	defs := []config.MetricDef{
+		{Name: "cpu_usage", Command: "echo 85"},
+		{Name: "mem_usage", Command: "echo 50"}, // no está en DB — debe default a "ok"
+	}
+
+	states := hydrateStates(ctx, database, defs)
+
+	// cpu_usage debe tener level warning
+	if states["cpu_usage"] == nil {
+		t.Fatal("expected state for cpu_usage, got nil")
+	}
+	if states["cpu_usage"].currentLevel != "warning" {
+		t.Errorf("expected currentLevel='warning', got %q", states["cpu_usage"].currentLevel)
+	}
+
+	// mem_usage no está en DB — debe ser "ok" por defecto
+	if states["mem_usage"] == nil {
+		t.Fatal("expected state for mem_usage, got nil")
+	}
+	if states["mem_usage"].currentLevel != "ok" {
+		t.Errorf("expected currentLevel='ok', got %q", states["mem_usage"].currentLevel)
+	}
+}
+
+// TestLevelToPriority: "warning" -> "high", "critical" -> "critical", "ok" -> "normal".
+func TestLevelToPriority(t *testing.T) {
+	tests := []struct {
+		level string
+		want  string
+	}{
+		{"warning", "high"},
+		{"critical", "critical"},
+		{"ok", "normal"},
+		{"", "normal"},
+	}
+	for _, tt := range tests {
+		got := levelToPriority(tt.level)
+		if got != tt.want {
+			t.Errorf("levelToPriority(%q) = %q, want %q", tt.level, got, tt.want)
+		}
+	}
+}
+
+// TestSendAlert_EnqueuesMessage verifica que sendAlert encola un mensaje en la DB.
+func TestSendAlert_EnqueuesMessage(t *testing.T) {
+	ctx := context.Background()
+	database := newTestDB(t)
+
+	// Seed los canales requeridos (necesario para que EnqueueMessage funcione)
+	// El canal 'general' debe existir en la config del dispatcher, pero EnqueueMessage
+	// simplemente inserta en la tabla messages sin validar el canal — OK.
+
+	def := config.MetricDef{
+		Name:    "cpu_usage",
+		Command: "echo 85",
+		Thresholds: &config.Thresholds{
+			Warning:  ptr(80.0),
+			Critical: ptr(95.0),
+		},
+	}
+
+	err := sendAlert(ctx, database, def, 85.0, "ok", "warning")
+	if err != nil {
+		t.Fatalf("sendAlert failed: %v", err)
+	}
+
+	// Verificar que hay un mensaje en la tabla messages
+	var count int
+	row := database.QueryRowContext(ctx, "SELECT COUNT(*) FROM messages WHERE channel='general'")
+	if err := row.Scan(&count); err != nil {
+		t.Fatalf("query messages: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("expected 1 message in messages, got %d", count)
+	}
+
+	// Verificar que el body menciona cpu_usage
+	var body string
+	row2 := database.QueryRowContext(ctx, "SELECT body FROM messages WHERE channel='general' LIMIT 1")
+	if err := row2.Scan(&body); err != nil {
+		t.Fatalf("scan body: %v", err)
+	}
+	if !strings.Contains(body, "cpu_usage") && !strings.Contains(body, "85") {
+		t.Errorf("body %q should mention cpu_usage or value 85", body)
 	}
 }
