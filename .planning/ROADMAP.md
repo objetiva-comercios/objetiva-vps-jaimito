@@ -124,7 +124,11 @@ Plans:
   3. Cuando una métrica cruza el umbral warning por primera vez, llega una alerta a Telegram; si sigue en warning en el siguiente poll, no llega una segunda alerta
   4. Cuando el estado pasa de warning a critical, llega una nueva alerta; cuando vuelve a ok, el estado se resetea correctamente para la próxima transición
   5. docker_running se recolecta si Docker está instalado; si no está instalado, la métrica falla silenciosamente sin afectar el servicio
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 09-01-PLAN.md — Paquete collector: runner.go (exec con timeout), collector.go (Start, goroutine-per-metric, collect-then-write), tests
+- [ ] 09-02-PLAN.md — Evaluator (state machine, thresholds, alertas via EnqueueMessage), integracion en serve.go, priority critical
 
 ### Phase 10: REST API y CLI
 **Goal**: El operador puede consultar el estado de las métricas y su historial desde la terminal o via HTTP, e ingestar lecturas manuales desde scripts externos
@@ -173,7 +177,7 @@ Plans:
 | 6. Configuracion y Escritura | v1.1 | 2/2 | Complete | 2026-03-25 |
 | 7. Verificacion e Integracion | v1.1 | 2/2 | Complete | 2026-03-26 |
 | 8. Config, Schema y CRUD | v2.0 | 0/2 | Planned    |  |
-| 9. Metrics Collector y Alertas | v2.0 | 0/? | Not started | - |
+| 9. Metrics Collector y Alertas | v2.0 | 0/2 | Planned    |  |
 | 10. REST API y CLI | v2.0 | 0/? | Not started | - |
 | 11. Dashboard Web Embedido | v2.0 | 0/? | Not started | - |
 | 12. Cleanup y Polish | v2.0 | 0/? | Not started | - |
