@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Métricas y Dashboard
-status: Ready to execute
-stopped_at: Completed 10-rest-api-y-cli-01-PLAN.md
-last_updated: "2026-03-27T12:30:49.232Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 10-rest-api-y-cli-02-PLAN.md
+last_updated: "2026-03-27T12:36:37.960Z"
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 14
-  completed_plans: 12
+  completed_plans: 13
 ---
 
 # Project State
@@ -58,6 +58,7 @@ Plan: 2 of 2
 | Phase 09 P01 | 3 | 2 tasks | 3 files |
 | Phase 09-metrics-collector-y-alertas P02 | 10 | 2 tasks | 5 files |
 | Phase 10 P01 | 8 | 2 tasks | 4 files |
+| Phase 10-rest-api-y-cli P02 | 2 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -93,6 +94,8 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - [Phase 09-02]: evaluator.go separado de collector.go — responsabilidades claras: state machine vs loop
 - [Phase 10]: Thresholds vienen del config en memoria (no de la DB) — GET /api/v1/metrics incluye campo thresholds solo cuando existen en cfg.Metrics.Definitions
 - [Phase 10]: IngestHandler usa status hardcodeado 'ok' — solo el evaluator evalua thresholds (D-10); escritura manual no interfiere con state machine de alertas
+- [Phase 10-rest-api-y-cli]: text/tabwriter en jaimito status: lipgloss/v2 table API no verificada en RESEARCH, tabwriter stdlib es mas seguro
+- [Phase 10-rest-api-y-cli]: GetMetrics sin auth header: endpoint publico per D-06 de investigacion de metricas
 
 ### Pending Todos
 
@@ -106,6 +109,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-27T12:30:49.220Z
-Stopped at: Completed 10-rest-api-y-cli-01-PLAN.md
+Last session: 2026-03-27T12:36:37.954Z
+Stopped at: Completed 10-rest-api-y-cli-02-PLAN.md
 Resume file: None

@@ -68,8 +68,8 @@ Requirements for Métricas y Dashboard milestone. Each maps to roadmap phases.
 
 ### CLI
 
-- [ ] **CLI-01**: `jaimito metric -n name --value X` envía una métrica manual via POST /api/v1/metrics
-- [ ] **CLI-02**: `jaimito status` muestra las métricas actuales en formato tabla (consulta GET /api/v1/metrics)
+- [x] **CLI-01**: `jaimito metric -n name --value X` envía una métrica manual via POST /api/v1/metrics
+- [x] **CLI-02**: `jaimito status` muestra las métricas actuales en formato tabla (consulta GET /api/v1/metrics)
 
 ### API
 
@@ -148,8 +148,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ALRT-02 | Phase 9 | Complete |
 | ALRT-03 | Phase 9 | Complete |
 | ALRT-04 | Phase 9 | Complete |
-| CLI-01 | Phase 10 | Pending |
-| CLI-02 | Phase 10 | Pending |
+| CLI-01 | Phase 10 | Complete |
+| CLI-02 | Phase 10 | Complete |
 | API-01 | Phase 10 | Complete |
 | API-02 | Phase 10 | Complete |
 | API-03 | Phase 10 | Complete |

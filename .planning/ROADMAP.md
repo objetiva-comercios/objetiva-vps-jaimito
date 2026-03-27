@@ -143,7 +143,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 10-01-PLAN.md — 3 handlers REST (MetricsListHandler, ReadingsHandler, IngestHandler), MetricExists helper, rutas en NewRouter, tests httptest
+- [x] 10-01-PLAN.md — 3 handlers REST (MetricsListHandler, ReadingsHandler, IngestHandler), MetricExists helper, rutas en NewRouter, tests httptest
 - [ ] 10-02-PLAN.md — Client extension (GetMetrics, PostMetric), jaimito status (tabla con emojis/colores), jaimito metric (ingesta manual)
 
 ### Phase 11: Dashboard Web Embedido
@@ -182,6 +182,6 @@ Plans:
 | 7. Verificacion e Integracion | v1.1 | 2/2 | Complete | 2026-03-26 |
 | 8. Config, Schema y CRUD | v2.0 | 0/2 | Planned    |  |
 | 9. Metrics Collector y Alertas | v2.0 | 0/2 | Planned    |  |
-| 10. REST API y CLI | v2.0 | 0/2 | Planned    |  |
+| 10. REST API y CLI | v2.0 | 1/2 | In Progress|  |
 | 11. Dashboard Web Embedido | v2.0 | 0/? | Not started | - |
 | 12. Cleanup y Polish | v2.0 | 0/? | Not started | - |
