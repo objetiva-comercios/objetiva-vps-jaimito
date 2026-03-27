@@ -180,7 +180,7 @@ func TestMetricType(t *testing.T) {
 	})
 }
 
-// TestCollectAndPersist verifica que collectAndPersist ejecuta el comando y persiste el valor en DB.
+// TestCollectAndPersist verifica que collectAndEvaluate ejecuta el comando y persiste el valor en DB.
 func TestCollectAndPersist(t *testing.T) {
 	ctx := context.Background()
 	database := newTestDB(t)
@@ -196,8 +196,9 @@ func TestCollectAndPersist(t *testing.T) {
 		t.Fatalf("upsert metric: %v", err)
 	}
 
-	// Ejecutar coleccion
-	collectAndPersist(ctx, database, cfg, def)
+	// Ejecutar coleccion con estado inicial ok
+	state := &metricState{currentLevel: "ok"}
+	collectAndEvaluate(ctx, database, cfg, def, state)
 
 	// Verificar que last_value fue actualizado en metrics
 	metrics, err := db.ListMetrics(ctx, database)
@@ -245,7 +246,8 @@ func TestCollectCommandFailure(t *testing.T) {
 	}
 
 	// Ejecutar coleccion — el comando falla, no debe producir reading
-	collectAndPersist(ctx, database, cfg, def)
+	state := &metricState{currentLevel: "ok"}
+	collectAndEvaluate(ctx, database, cfg, def, state)
 
 	// Verificar que metric_readings esta vacio
 	readings, err := db.QueryReadings(ctx, database, def.Name, time.Time{})
@@ -451,5 +453,82 @@ func TestSendAlert_EnqueuesMessage(t *testing.T) {
 	}
 	if !strings.Contains(body, "cpu_usage") && !strings.Contains(body, "85") {
 		t.Errorf("body %q should mention cpu_usage or value 85", body)
+	}
+}
+
+// TestCollectAndEvaluate_AlertOnTransition verifica que se encola un mensaje en ok->warning.
+func TestCollectAndEvaluate_AlertOnTransition(t *testing.T) {
+	ctx := context.Background()
+	database := newTestDB(t)
+	cfg := newTestMetricsConfig("60s")
+
+	def := config.MetricDef{
+		Name:    "test_alert",
+		Command: "echo 85",
+		Thresholds: &config.Thresholds{
+			Warning: ptr(80.0),
+		},
+	}
+
+	// Upsert la metrica (como hace Start())
+	if err := db.UpsertMetric(ctx, database, def.Name, "custom", "gauge"); err != nil {
+		t.Fatalf("upsert metric: %v", err)
+	}
+
+	// Estado inicial ok
+	state := &metricState{currentLevel: "ok"}
+
+	// Ejecutar coleccion con valor 85 (por encima del umbral warning=80)
+	collectAndEvaluate(ctx, database, cfg, def, state)
+
+	// Verificar que se encolo un mensaje de alerta en la tabla messages
+	var count int
+	row := database.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM messages WHERE channel='general' AND title LIKE '%test_alert%'")
+	if err := row.Scan(&count); err != nil {
+		t.Fatalf("query messages: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("expected 1 alert message after ok->warning transition, got %d", count)
+	}
+}
+
+// TestCollectAndEvaluate_NoDoubleAlert verifica que no se encola un segundo mensaje en mismo nivel.
+func TestCollectAndEvaluate_NoDoubleAlert(t *testing.T) {
+	ctx := context.Background()
+	database := newTestDB(t)
+	cfg := newTestMetricsConfig("60s")
+
+	def := config.MetricDef{
+		Name:    "test_no_double",
+		Command: "echo 85",
+		Thresholds: &config.Thresholds{
+			Warning: ptr(80.0),
+		},
+	}
+
+	// Upsert la metrica
+	if err := db.UpsertMetric(ctx, database, def.Name, "custom", "gauge"); err != nil {
+		t.Fatalf("upsert metric: %v", err)
+	}
+
+	// Estado inicial ok
+	state := &metricState{currentLevel: "ok"}
+
+	// Primera llamada: ok -> warning, debe encolar
+	collectAndEvaluate(ctx, database, cfg, def, state)
+
+	// Segunda llamada: warning -> warning (mismo nivel), NO debe encolar
+	collectAndEvaluate(ctx, database, cfg, def, state)
+
+	// Verificar que solo hay 1 mensaje (no 2)
+	var count int
+	row := database.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM messages WHERE channel='general' AND title LIKE '%test_no_double%'")
+	if err := row.Scan(&count); err != nil {
+		t.Fatalf("query messages: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("expected 1 alert message (no double alert), got %d", count)
 	}
 }

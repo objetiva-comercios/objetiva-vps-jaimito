@@ -53,6 +53,9 @@ func metricType(def config.MetricDef) string {
 // Por D-02: arranca automaticamente si cfg != nil (gestionado por el caller en serve.go).
 // Fire-and-forget — no retorna nada, igual que dispatcher.Start() y cleanup.Start().
 func Start(ctx context.Context, database *sql.DB, cfg *config.MetricsConfig) {
+	// Rehidratar estados desde DB (D-09): evita alertas duplicadas post-restart.
+	states := hydrateStates(ctx, database, cfg.Definitions)
+
 	// Upsert todas las metricas en la DB antes de arrancar los loops.
 	// Esto asegura que metric_readings puede FK-referenciar a metrics.
 	for _, def := range cfg.Definitions {
@@ -62,9 +65,14 @@ func Start(ctx context.Context, database *sql.DB, cfg *config.MetricsConfig) {
 		}
 	}
 
-	// Lanzar una goroutine por metrica.
+	// Lanzar una goroutine por metrica (D-01).
 	for _, def := range cfg.Definitions {
-		go runMetricLoop(ctx, database, cfg, def)
+		def := def
+		state := states[def.Name]
+		if state == nil {
+			state = &metricState{currentLevel: "ok"}
+		}
+		go runMetricLoop(ctx, database, cfg, def, state)
 	}
 }
 
@@ -72,34 +80,36 @@ func Start(ctx context.Context, database *sql.DB, cfg *config.MetricsConfig) {
 // Por D-01: ticker independiente por metrica.
 // Patron startup-then-interval (igual que cleanup.Start): coleccion inmediata al arrancar,
 // luego a intervalos regulares.
-func runMetricLoop(ctx context.Context, database *sql.DB, cfg *config.MetricsConfig, def config.MetricDef) {
+func runMetricLoop(ctx context.Context, database *sql.DB, cfg *config.MetricsConfig, def config.MetricDef, state *metricState) {
 	interval := resolveInterval(def, cfg)
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	// Coleccion inmediata al arrancar (startup-then-interval).
-	collectAndPersist(ctx, database, cfg, def)
+	collectAndEvaluate(ctx, database, cfg, def, state)
 
 	for {
 		select {
 		case <-ticker.C:
-			collectAndPersist(ctx, database, cfg, def)
+			collectAndEvaluate(ctx, database, cfg, def, state)
 		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-// collectAndPersist ejecuta el comando de una metrica y persiste el resultado en la DB.
-// Flujo collect-then-write per D-10:
+// collectAndEvaluate ejecuta el comando de una metrica, persiste el resultado y evalua alertas.
+// Flujo collect-then-evaluate per D-10:
 //  1. Ejecutar comando con timeout
 //  2. Si falla: loguear con slog.Error y return (MCOL-05)
-//  3. UpdateMetricStatus (last_value + last_status)
-//  4. InsertReading (timeseries)
+//  3. Evaluar nivel con evaluateLevel
+//  4. UpdateMetricStatus (last_value + last_status con nivel real)
+//  5. InsertReading (timeseries)
+//  6. Si shouldAlert: transition + sendAlert
 //
 // Este comportamiento garantiza que docker_running falla silenciosamente cuando
 // Docker no esta instalado (MCOL-02): runCommand retorna error y el loop continua.
-func collectAndPersist(ctx context.Context, database *sql.DB, cfg *config.MetricsConfig, def config.MetricDef) {
+func collectAndEvaluate(ctx context.Context, database *sql.DB, cfg *config.MetricsConfig, def config.MetricDef, state *metricState) {
 	timeout := computeTimeout(resolveInterval(def, cfg))
 	value, err := runCommand(ctx, def.Command, timeout)
 	if err != nil {
@@ -110,19 +120,35 @@ func collectAndPersist(ctx context.Context, database *sql.DB, cfg *config.Metric
 		return
 	}
 
-	// Nota: en este plan el status es siempre "ok".
-	// La state machine real (ok/warning/critical) se implementa en Plan 02.
-	if err := db.UpdateMetricStatus(ctx, database, def.Name, value, "ok"); err != nil {
-		slog.Error("update metric status failed",
-			"metric", def.Name,
-			"error", err,
-		)
+	// 3. Evaluar nivel contra umbrales configurados
+	newLevel := evaluateLevel(value, def.Thresholds)
+
+	// 4. Persistir estado en DB (siempre, D-10)
+	if err := db.UpdateMetricStatus(ctx, database, def.Name, value, newLevel); err != nil {
+		slog.Error("update metric status failed", "metric", def.Name, "error", err)
 	}
 
+	// 5. Insertar reading en timeseries
 	if err := db.InsertReading(ctx, database, def.Name, value); err != nil {
-		slog.Error("insert reading failed",
-			"metric", def.Name,
-			"error", err,
-		)
+		slog.Error("insert reading failed", "metric", def.Name, "error", err)
+	}
+
+	// 6. Evaluar si se debe alertar
+	cooldown := 30 * time.Minute // default
+	if cfg.AlertCooldown != "" {
+		if d, err := config.ParseDuration(cfg.AlertCooldown); err == nil {
+			cooldown = d
+		}
+	}
+
+	if state.shouldAlert(newLevel, cooldown) {
+		fromLevel := state.currentLevel
+		state.transition(newLevel)
+		if err := sendAlert(ctx, database, def, value, fromLevel, newLevel); err != nil {
+			slog.Error("send alert failed", "metric", def.Name, "error", err)
+		}
+	} else if state.currentLevel != newLevel {
+		// Actualizar el nivel sin enviar alerta (ej: recovery silenciosa dentro de cooldown)
+		state.transition(newLevel)
 	}
 }

@@ -13,6 +13,7 @@ import (
 
 	"github.com/chiguire/jaimito/internal/api"
 	"github.com/chiguire/jaimito/internal/cleanup"
+	"github.com/chiguire/jaimito/internal/collector"
 	"github.com/chiguire/jaimito/internal/config"
 	"github.com/chiguire/jaimito/internal/db"
 	"github.com/chiguire/jaimito/internal/dispatcher"
@@ -83,7 +84,13 @@ func runServe(cmd *cobra.Command, args []string) error {
 	// 11. Start cleanup scheduler — purges old messages in background goroutine.
 	cleanup.Start(ctx, database, 24*time.Hour)
 
-	// 12. Start HTTP server — serves API endpoints for notification ingestion.
+	// 12. Start metrics collector — optional, only if metrics section is configured (D-02).
+	if cfg.Metrics != nil {
+		collector.Start(ctx, database, cfg.Metrics)
+		slog.Info("metrics collector started", "metrics_count", len(cfg.Metrics.Definitions))
+	}
+
+	// 13. Start HTTP server — serves API endpoints for notification ingestion.
 	router := api.NewRouter(database, cfg)
 	server := &http.Server{
 		Addr:         cfg.Server.Listen,
@@ -99,14 +106,14 @@ func runServe(cmd *cobra.Command, args []string) error {
 		}
 	}()
 
-	// 13. Log ready state — all components initialized successfully.
+	// 14. Log ready state — all components initialized successfully.
 	slog.Info("jaimito started",
 		"addr", cfg.Server.Listen,
 		"channels", len(cfg.Channels),
 		"db", cfg.Database.Path,
 	)
 
-	// 14. Wait for shutdown signal — graceful shutdown with 30s timeout.
+	// 15. Wait for shutdown signal — graceful shutdown with 30s timeout.
 	<-ctx.Done()
 	slog.Info("shutting down")
 
