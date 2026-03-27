@@ -9,9 +9,10 @@ import (
 
 // priorityEmoji maps priority strings to traffic light emoji per CONTEXT.md.
 var priorityEmoji = map[string]string{
-	"low":    "🟢",
-	"normal": "🟡",
-	"high":   "🔴",
+	"low":      "🟢",
+	"normal":   "🟡",
+	"high":     "🔴",
+	"critical": "🔴",
 }
 
 // FormatMessage produces a MarkdownV2-formatted string for the given message.
