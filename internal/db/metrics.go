@@ -137,3 +137,12 @@ func UpdateMetricStatus(ctx context.Context, db *sql.DB, name string, value floa
 	}
 	return nil
 }
+
+// MetricExists retorna true si la metrica existe en la tabla metrics.
+func MetricExists(ctx context.Context, db *sql.DB, name string) (bool, error) {
+	var count int
+	err := db.QueryRowContext(ctx,
+		`SELECT COUNT(1) FROM metrics WHERE name = ?`, name,
+	).Scan(&count)
+	return count > 0, err
+}

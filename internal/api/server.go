@@ -24,11 +24,14 @@ func NewRouter(database *sql.DB, cfg *config.Config) http.Handler {
 
 	// Unauthenticated routes.
 	r.Get("/api/v1/health", HealthHandler)
+	r.Get("/api/v1/metrics", MetricsListHandler(database, cfg))
+	r.Get("/api/v1/metrics/{name}/readings", ReadingsHandler(database, cfg))
 
 	// Authenticated routes.
 	r.Group(func(r chi.Router) {
 		r.Use(BearerAuth(database))
 		r.Post("/api/v1/notify", NotifyHandler(database, cfg))
+		r.Post("/api/v1/metrics", IngestHandler(database, cfg))
 	})
 
 	return r
