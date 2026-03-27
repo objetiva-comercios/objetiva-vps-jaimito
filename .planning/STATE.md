@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Métricas y Dashboard
-status: Ready to plan
-stopped_at: Phase 9 context gathered
-last_updated: "2026-03-27T01:02:08.308Z"
+status: Ready to execute
+stopped_at: Completed 10-rest-api-y-cli-01-PLAN.md
+last_updated: "2026-03-27T12:30:49.232Z"
 progress:
   total_phases: 9
-  completed_phases: 5
-  total_plans: 10
-  completed_plans: 10
+  completed_phases: 6
+  total_plans: 14
+  completed_plans: 12
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** Every event that happens on the VPS gets reliably captured and delivered to Telegram — no notification is ever lost silently.
-**Current focus:** Phase 08 — config-schema-y-crud
+**Current focus:** Phase 10 — rest-api-y-cli
 
 ## Current Position
 
-Phase: 9
-Plan: Not started
+Phase: 10 (rest-api-y-cli) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -55,6 +55,9 @@ Plan: Not started
 | Phase 07 P02 | 15 | 2 tasks | 1 files |
 | Phase 08 P01 | 12 | 2 tasks | 3 files |
 | Phase 08 P02 | 132 | 2 tasks | 4 files |
+| Phase 09 P01 | 3 | 2 tasks | 3 files |
+| Phase 09-metrics-collector-y-alertas P02 | 10 | 2 tasks | 5 files |
+| Phase 10 P01 | 8 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -84,6 +87,12 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - [Phase 08]: parseDuration not exported; ParseDuration (uppercase) exported for Phase 9+ use
 - [Phase 08-02]: strftime RFC3339 en tablas de metricas en vez de datetime('now') — habilita queries de rango con time.RFC3339 desde Go
 - [Phase 08-02]: QueryReadings y ListMetrics retornan slice vacio (no nil) — contrato consistente para callers
+- [Phase 09]: runCommand usa 'sh -c' (POSIX sh) con WaitDelay=5s para forzar kill despues del timeout
+- [Phase 09]: Status hardcodeado 'ok' en Phase 9-01; state machine real (ok/warning/critical) implementada en 9-02
+- [Phase 09-02]: shouldAlert cooldown: !s.lastAlert.IsZero() garantiza primera alerta siempre; recovery (cualquier->ok) ignora cooldown
+- [Phase 09-02]: evaluator.go separado de collector.go — responsabilidades claras: state machine vs loop
+- [Phase 10]: Thresholds vienen del config en memoria (no de la DB) — GET /api/v1/metrics incluye campo thresholds solo cuando existen en cfg.Metrics.Definitions
+- [Phase 10]: IngestHandler usa status hardcodeado 'ok' — solo el evaluator evalua thresholds (D-10); escritura manual no interfiere con state machine de alertas
 
 ### Pending Todos
 
@@ -97,6 +106,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-27T01:02:08.300Z
-Stopped at: Phase 9 context gathered
-Resume file: .planning/phases/09-metrics-collector-y-alertas/09-CONTEXT.md
+Last session: 2026-03-27T12:30:49.220Z
+Stopped at: Completed 10-rest-api-y-cli-01-PLAN.md
+Resume file: None

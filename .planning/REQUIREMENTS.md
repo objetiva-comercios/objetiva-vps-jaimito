@@ -38,11 +38,11 @@ Requirements for Métricas y Dashboard milestone. Each maps to roadmap phases.
 
 ### Metrics Collection
 
-- [ ] **MCOL-01**: Jaimito ejecuta comandos shell a intervalos configurables para recolectar métricas del sistema
-- [ ] **MCOL-02**: Métricas predefinidas incluidas: disk_root (%), ram_used (%), cpu_load, docker_running, uptime_days
+- [x] **MCOL-01**: Jaimito ejecuta comandos shell a intervalos configurables para recolectar métricas del sistema
+- [x] **MCOL-02**: Métricas predefinidas incluidas: disk_root (%), ram_used (%), cpu_load, docker_running, uptime_days
 - [x] **MCOL-03**: El usuario puede definir métricas custom en config.yaml con nombre, categoría, comando, intervalo y tipo
-- [ ] **MCOL-04**: Cada comando se ejecuta con timeout de 10 segundos (exec.CommandContext + WaitDelay)
-- [ ] **MCOL-05**: Si un comando falla, se registra en logs sin afectar las demás métricas
+- [x] **MCOL-04**: Cada comando se ejecuta con timeout de 10 segundos (exec.CommandContext + WaitDelay)
+- [x] **MCOL-05**: Si un comando falla, se registra en logs sin afectar las demás métricas
 
 ### Storage
 
@@ -62,9 +62,9 @@ Requirements for Métricas y Dashboard milestone. Each maps to roadmap phases.
 ### Alerting
 
 - [x] **ALRT-01**: Cada métrica define umbrales warning y critical en config.yaml
-- [ ] **ALRT-02**: Cuando una métrica cruza un umbral, jaimito envía alerta a Telegram via el dispatcher existente
-- [ ] **ALRT-03**: State machine por métrica (ok→warning→critical): alerta solo en transición de nivel, no en cada poll
-- [ ] **ALRT-04**: Cooldown configurable (default 30 minutos) para evitar alert storms
+- [x] **ALRT-02**: Cuando una métrica cruza un umbral, jaimito envía alerta a Telegram via el dispatcher existente
+- [x] **ALRT-03**: State machine por métrica (ok→warning→critical): alerta solo en transición de nivel, no en cada poll
+- [x] **ALRT-04**: Cooldown configurable (default 30 minutos) para evitar alert storms
 
 ### CLI
 
@@ -73,9 +73,9 @@ Requirements for Métricas y Dashboard milestone. Each maps to roadmap phases.
 
 ### API
 
-- [ ] **API-01**: GET /api/v1/metrics retorna lista de métricas con último valor, config y estado (sin auth)
-- [ ] **API-02**: GET /api/v1/metrics/{name}/readings retorna historial con query param ?since=2h|24h|7d (sin auth)
-- [ ] **API-03**: POST /api/v1/metrics permite ingestar readings manuales (con Bearer auth)
+- [x] **API-01**: GET /api/v1/metrics retorna lista de métricas con último valor, config y estado (sin auth)
+- [x] **API-02**: GET /api/v1/metrics/{name}/readings retorna historial con query param ?since=2h|24h|7d (sin auth)
+- [x] **API-03**: POST /api/v1/metrics permite ingestar readings manuales (con Bearer auth)
 
 ## Future Requirements
 
@@ -130,11 +130,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONF-04 | Phase 6 | Complete |
 | TEST-01 | Phase 7 | Complete |
 | INST-01 | Phase 7 | Complete |
-| MCOL-01 | Phase 9 | Pending |
-| MCOL-02 | Phase 9 | Pending |
+| MCOL-01 | Phase 9 | Complete |
+| MCOL-02 | Phase 9 | Complete |
 | MCOL-03 | Phase 8 | Complete |
-| MCOL-04 | Phase 9 | Pending |
-| MCOL-05 | Phase 9 | Pending |
+| MCOL-04 | Phase 9 | Complete |
+| MCOL-05 | Phase 9 | Complete |
 | STOR-01 | Phase 8 | Pending |
 | STOR-02 | Phase 12 | Pending |
 | STOR-03 | Phase 8 | Complete |
@@ -145,14 +145,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DASH-05 | Phase 11 | Pending |
 | DASH-06 | Phase 11 | Pending |
 | ALRT-01 | Phase 8 | Complete |
-| ALRT-02 | Phase 9 | Pending |
-| ALRT-03 | Phase 9 | Pending |
-| ALRT-04 | Phase 9 | Pending |
+| ALRT-02 | Phase 9 | Complete |
+| ALRT-03 | Phase 9 | Complete |
+| ALRT-04 | Phase 9 | Complete |
 | CLI-01 | Phase 10 | Pending |
 | CLI-02 | Phase 10 | Pending |
-| API-01 | Phase 10 | Pending |
-| API-02 | Phase 10 | Pending |
-| API-03 | Phase 10 | Pending |
+| API-01 | Phase 10 | Complete |
+| API-02 | Phase 10 | Complete |
+| API-03 | Phase 10 | Complete |
 
 **Coverage:**
 - v1.1 requirements: 12 total (all complete)

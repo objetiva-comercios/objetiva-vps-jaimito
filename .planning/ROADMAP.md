@@ -127,7 +127,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 09-01-PLAN.md — Paquete collector: runner.go (exec con timeout), collector.go (Start, goroutine-per-metric, collect-then-write), tests
+- [x] 09-01-PLAN.md — Paquete collector: runner.go (exec con timeout), collector.go (Start, goroutine-per-metric, collect-then-write), tests
 - [ ] 09-02-PLAN.md — Evaluator (state machine, thresholds, alertas via EnqueueMessage), integracion en serve.go, priority critical
 
 ### Phase 10: REST API y CLI
@@ -140,7 +140,11 @@ Plans:
   3. `POST /api/v1/metrics` con Bearer token ingesta una lectura manual y retorna 201; sin token retorna 401
   4. `jaimito status` imprime una tabla en terminal con nombre, valor actual, unidad, estado y tiempo de última lectura de cada métrica
   5. `jaimito metric -n nombre --value 42.5` envía una lectura manual via POST y confirma éxito o imprime el error recibido
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 10-01-PLAN.md — 3 handlers REST (MetricsListHandler, ReadingsHandler, IngestHandler), MetricExists helper, rutas en NewRouter, tests httptest
+- [ ] 10-02-PLAN.md — Client extension (GetMetrics, PostMetric), jaimito status (tabla con emojis/colores), jaimito metric (ingesta manual)
 
 ### Phase 11: Dashboard Web Embedido
 **Goal**: El operador puede abrir el dashboard en un browser y ver todas las métricas del VPS en tiempo real con gráficos expandibles y sin instalar nada extra
@@ -178,6 +182,6 @@ Plans:
 | 7. Verificacion e Integracion | v1.1 | 2/2 | Complete | 2026-03-26 |
 | 8. Config, Schema y CRUD | v2.0 | 0/2 | Planned    |  |
 | 9. Metrics Collector y Alertas | v2.0 | 0/2 | Planned    |  |
-| 10. REST API y CLI | v2.0 | 0/? | Not started | - |
+| 10. REST API y CLI | v2.0 | 0/2 | Planned    |  |
 | 11. Dashboard Web Embedido | v2.0 | 0/? | Not started | - |
 | 12. Cleanup y Polish | v2.0 | 0/? | Not started | - |
