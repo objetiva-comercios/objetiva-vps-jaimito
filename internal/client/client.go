@@ -45,6 +45,112 @@ type errorResponse struct {
 	Error string `json:"error"`
 }
 
+// MetricRow represents a metric as returned by GET /api/v1/metrics.
+type MetricRow struct {
+	Name       string      `json:"name"`
+	Category   string      `json:"category"`
+	Type       string      `json:"type"`
+	LastValue  *float64    `json:"last_value"`
+	LastStatus string      `json:"last_status"`
+	UpdatedAt  string      `json:"updated_at"`
+	Thresholds *Thresholds `json:"thresholds,omitempty"`
+}
+
+// Thresholds holds warning/critical threshold values.
+type Thresholds struct {
+	Warning  *float64 `json:"warning,omitempty"`
+	Critical *float64 `json:"critical,omitempty"`
+}
+
+// PostMetricRequest is the body for POST /api/v1/metrics.
+type PostMetricRequest struct {
+	Name  string  `json:"name"`
+	Value float64 `json:"value"`
+}
+
+// PostMetricResponse is returned by POST /api/v1/metrics on success.
+type PostMetricResponse struct {
+	Name       string  `json:"name"`
+	Value      float64 `json:"value"`
+	RecordedAt string  `json:"recorded_at"`
+}
+
+// GetMetrics calls GET /api/v1/metrics. No authentication required.
+func (c *Client) GetMetrics(ctx context.Context) ([]MetricRow, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
+		c.serverURL+"/api/v1/metrics", nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	// No Authorization header — public endpoint.
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		var errResp errorResponse
+		if json.Unmarshal(respBody, &errResp) == nil && errResp.Error != "" {
+			return nil, fmt.Errorf("server error (%d): %s", resp.StatusCode, errResp.Error)
+		}
+		return nil, fmt.Errorf("server error (%d): %s", resp.StatusCode, string(respBody))
+	}
+
+	var result []MetricRow
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, fmt.Errorf("parse response: %w", err)
+	}
+	return result, nil
+}
+
+// PostMetric sends a manual reading via POST /api/v1/metrics. Requires auth.
+func (c *Client) PostMetric(ctx context.Context, req PostMetricRequest) (*PostMetricResponse, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		c.serverURL+"/api/v1/metrics", bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+c.apiKey)
+
+	resp, err := c.http.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusCreated {
+		var errResp errorResponse
+		if json.Unmarshal(respBody, &errResp) == nil && errResp.Error != "" {
+			return nil, fmt.Errorf("server error (%d): %s", resp.StatusCode, errResp.Error)
+		}
+		return nil, fmt.Errorf("server error (%d): %s", resp.StatusCode, string(respBody))
+	}
+
+	var result PostMetricResponse
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, fmt.Errorf("parse response: %w", err)
+	}
+	return &result, nil
+}
+
 // Notify sends a notification and returns the message ID on success.
 func (c *Client) Notify(ctx context.Context, req NotifyRequest) (string, error) {
 	body, err := json.Marshal(req)
