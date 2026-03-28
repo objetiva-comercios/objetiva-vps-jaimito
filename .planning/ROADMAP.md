@@ -156,8 +156,11 @@ Plans:
   3. Hacer click en una fila expande un gráfico uPlot con el historial de esa métrica; un segundo click lo colapsa
   4. El dashboard muestra el hostname del VPS y actualiza los datos cada 30 segundos sin recargar la página completa
   5. El dashboard funciona correctamente con Tailwind CSS pre-compilado embedido, sin requerir conexión a internet ni CDN externos
-**Plans**: TBD
-**UI hint**: yes
+**Plans**: 2 plans
+
+Plans:
+- [ ] 11-01-PLAN.md — Infraestructura Go: embed.go, DashboardHandler con hostname injection, ruta GET /dashboard, vendor libs, build script Tailwind
+- [ ] 11-02-PLAN.md — HTML completo del dashboard: tabla de metricas, sparklines SVG, graficos uPlot, Alpine.js polling, Tailwind CSS compilado
 
 ### Phase 12: Cleanup y Polish
 **Goal**: La retención de datos se aplica automáticamente para que la DB no crezca indefinidamente, y el ejemplo de config documenta todas las capacidades de v2.0
@@ -183,5 +186,5 @@ Plans:
 | 8. Config, Schema y CRUD | v2.0 | 0/2 | Planned    |  |
 | 9. Metrics Collector y Alertas | v2.0 | 0/2 | Planned    |  |
 | 10. REST API y CLI | v2.0 | 1/2 | Complete    | 2026-03-27 |
-| 11. Dashboard Web Embedido | v2.0 | 0/? | Not started | - |
+| 11. Dashboard Web Embedido | v2.0 | 0/2 | Planned | - |
 | 12. Cleanup y Polish | v2.0 | 0/? | Not started | - |
