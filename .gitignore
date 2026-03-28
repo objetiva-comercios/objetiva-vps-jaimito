@@ -24,3 +24,6 @@ setup.test
 
 # Logs
 *.log
+
+# Tools (binarios descargados, e.g. Tailwind CLI ~17MB)
+tools/

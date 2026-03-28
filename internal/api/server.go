@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/chiguire/jaimito/internal/config"
+	"github.com/chiguire/jaimito/internal/web"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
@@ -26,6 +27,9 @@ func NewRouter(database *sql.DB, cfg *config.Config) http.Handler {
 	r.Get("/api/v1/health", HealthHandler)
 	r.Get("/api/v1/metrics", MetricsListHandler(database, cfg))
 	r.Get("/api/v1/metrics/{name}/readings", ReadingsHandler(database, cfg))
+
+	// Dashboard (unauthenticated, per D-14).
+	r.Get("/dashboard", web.DashboardHandler())
 
 	// Authenticated routes.
 	r.Group(func(r chi.Router) {
