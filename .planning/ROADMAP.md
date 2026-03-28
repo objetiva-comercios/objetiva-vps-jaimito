@@ -33,7 +33,7 @@
 
 - [ ] **Phase 8: Config, Schema y CRUD** — El sistema tiene las tablas SQLite, tipos de config y funciones de base de datos necesarias para que las demás fases compilen y funcionen
 - [ ] **Phase 9: Metrics Collector y Alertas** — jaimito recolecta métricas del sistema de forma autónoma a intervalos configurables y envía alertas a Telegram cuando se cruzan umbrales
-- [ ] **Phase 10: REST API y CLI** — El operador puede consultar métricas actuales e históricas via API y terminal, e ingestar métricas manuales desde scripts
+- [x] **Phase 10: REST API y CLI** — El operador puede consultar métricas actuales e históricas via API y terminal, e ingestar métricas manuales desde scripts (completed 2026-03-27)
 - [ ] **Phase 11: Dashboard Web Embedido** — El operador puede abrir el dashboard en un browser y ver todas las métricas con gráficos expandibles y auto-refresh
 - [ ] **Phase 12: Cleanup y Polish** — La retención de datos se aplica automáticamente y la configuración de ejemplo documenta todas las opciones de v2.0
 
@@ -182,6 +182,6 @@ Plans:
 | 7. Verificacion e Integracion | v1.1 | 2/2 | Complete | 2026-03-26 |
 | 8. Config, Schema y CRUD | v2.0 | 0/2 | Planned    |  |
 | 9. Metrics Collector y Alertas | v2.0 | 0/2 | Planned    |  |
-| 10. REST API y CLI | v2.0 | 1/2 | In Progress|  |
+| 10. REST API y CLI | v2.0 | 1/2 | Complete    | 2026-03-27 |
 | 11. Dashboard Web Embedido | v2.0 | 0/? | Not started | - |
 | 12. Cleanup y Polish | v2.0 | 0/? | Not started | - |
