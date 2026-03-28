@@ -34,7 +34,7 @@
 - [ ] **Phase 8: Config, Schema y CRUD** — El sistema tiene las tablas SQLite, tipos de config y funciones de base de datos necesarias para que las demás fases compilen y funcionen
 - [ ] **Phase 9: Metrics Collector y Alertas** — jaimito recolecta métricas del sistema de forma autónoma a intervalos configurables y envía alertas a Telegram cuando se cruzan umbrales
 - [x] **Phase 10: REST API y CLI** — El operador puede consultar métricas actuales e históricas via API y terminal, e ingestar métricas manuales desde scripts (completed 2026-03-27)
-- [ ] **Phase 11: Dashboard Web Embedido** — El operador puede abrir el dashboard en un browser y ver todas las métricas con gráficos expandibles y auto-refresh
+- [x] **Phase 11: Dashboard Web Embedido** — El operador puede abrir el dashboard en un browser y ver todas las métricas con gráficos expandibles y auto-refresh (completed 2026-03-28)
 - [ ] **Phase 12: Cleanup y Polish** — La retención de datos se aplica automáticamente y la configuración de ejemplo documenta todas las opciones de v2.0
 
 ## Phase Details
@@ -160,7 +160,7 @@ Plans:
 
 Plans:
 - [x] 11-01-PLAN.md — Infraestructura Go: embed.go, DashboardHandler con hostname injection, ruta GET /dashboard, vendor libs, build script Tailwind
-- [ ] 11-02-PLAN.md — HTML completo del dashboard: tabla de metricas, sparklines SVG, graficos uPlot, Alpine.js polling, Tailwind CSS compilado
+- [x] 11-02-PLAN.md — HTML completo del dashboard: tabla de metricas, sparklines SVG, graficos uPlot, Alpine.js polling, Tailwind CSS compilado
 
 ### Phase 12: Cleanup y Polish
 **Goal**: La retención de datos se aplica automáticamente para que la DB no crezca indefinidamente, y el ejemplo de config documenta todas las capacidades de v2.0
@@ -186,5 +186,5 @@ Plans:
 | 8. Config, Schema y CRUD | v2.0 | 0/2 | Planned    |  |
 | 9. Metrics Collector y Alertas | v2.0 | 0/2 | Planned    |  |
 | 10. REST API y CLI | v2.0 | 1/2 | Complete    | 2026-03-27 |
-| 11. Dashboard Web Embedido | v2.0 | 1/2 | In Progress|  |
+| 11. Dashboard Web Embedido | v2.0 | 2/2 | Complete   | 2026-03-28 |
 | 12. Cleanup y Polish | v2.0 | 0/? | Not started | - |

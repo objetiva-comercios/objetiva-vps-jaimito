@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Métricas y Dashboard
-status: Ready to execute
-stopped_at: Completed 11-dashboard-web-embedido-01-PLAN.md
-last_updated: "2026-03-28T21:42:08.289Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 11-dashboard-web-embedido-02-PLAN.md
+last_updated: "2026-03-28T23:52:46.200Z"
 progress:
   total_phases: 9
-  completed_phases: 7
-  total_plans: 16
+  completed_phases: 3
+  total_plans: 8
   completed_plans: 15
 ---
 
@@ -60,6 +60,7 @@ Plan: 2 of 2
 | Phase 10 P01 | 8 | 2 tasks | 4 files |
 | Phase 10-rest-api-y-cli P02 | 2 | 2 tasks | 3 files |
 | Phase 11 P01 | 8 | 3 tasks | 9 files |
+| Phase 11 P02 | 125 | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -100,6 +101,8 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - [Phase 11-01]: DashboardHandler lee HTML embedido una vez en creacion del handler via sync.OnceValue para hostname caching — no por request
 - [Phase 11-01]: GET /dashboard sin autenticacion — consistente con HealthHandler pattern (D-14)
 - [Phase 11-01]: Vendor libs en internal/web/vendor/ para uso inline en Plan 02 — no se embeden directamente aun
+- [Phase 11]: sparkData acumulado via polling: sparklines se construyen de last_value por metrica, no de readings endpoint
+- [Phase 11]: Tailwind v4 requiere @source explicit en input.css para escanear HTML fuera del directorio CSS
 
 ### Pending Todos
 
@@ -113,6 +116,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-28T21:42:08.285Z
-Stopped at: Completed 11-dashboard-web-embedido-01-PLAN.md
+Last session: 2026-03-28T23:52:46.195Z
+Stopped at: Completed 11-dashboard-web-embedido-02-PLAN.md
 Resume file: None
