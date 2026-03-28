@@ -19,7 +19,7 @@
 #   8. Verifica que el servicio este corriendo
 #
 # Requisitos:
-#   - Go 1.24+
+#   - Go 1.25+
 #   - git
 #   - systemd
 #   - sudo
@@ -39,7 +39,7 @@ DATA_DIR="/var/lib/jaimito"
 SERVICE_NAME="jaimito"
 SERVICE_FILE="systemd/jaimito.service"
 HEALTH_URL="http://127.0.0.1:8080/api/v1/health"
-GO_MIN_VERSION="1.24"
+GO_MIN_VERSION="1.25"
 
 # -- Colores -----------------------------------------------------------------
 RED='\033[0;31m'
@@ -57,7 +57,7 @@ error() { echo -e "${RED}[ERROR]${NC} $*"; exit 1; }
 echo ""
 echo "=========================================="
 echo "  jaimito — Instalador"
-echo "  VPS Push Notification Hub"
+echo "  VPS Notification Hub + Monitoring"
 echo "=========================================="
 echo ""
 
@@ -252,6 +252,11 @@ echo -e "${CYAN}Gestionar API keys:${NC}"
 echo "  jaimito keys create --name mi-servicio"
 echo "  jaimito keys list"
 echo "  jaimito keys revoke <id>"
+echo ""
+echo -e "${CYAN}Metricas y dashboard (v2.0):${NC}"
+echo "  jaimito status                        # Ver metricas actuales"
+echo "  jaimito metric disk_root 42.5         # Ingestar metrica manual"
+echo "  http://127.0.0.1:8080/dashboard       # Dashboard web"
 echo ""
 echo -e "${CYAN}Mas info:${NC}  jaimito --help  |  jaimito send --help"
 echo ""
