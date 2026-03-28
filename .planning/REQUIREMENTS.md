@@ -52,11 +52,11 @@ Requirements for Métricas y Dashboard milestone. Each maps to roadmap phases.
 
 ### Dashboard
 
-- [ ] **DASH-01**: Dashboard web accesible en GET /dashboard servido desde archivos embedidos (go:embed)
+- [x] **DASH-01**: Dashboard web accesible en GET /dashboard servido desde archivos embedidos (go:embed)
 - [ ] **DASH-02**: Vista principal: tabla con todas las métricas (nombre, valor actual, sparkline de tendencia, indicador de estado)
 - [ ] **DASH-03**: Click en una fila expande un gráfico temporal (uPlot) con historial de esa métrica
 - [ ] **DASH-04**: Auto-refresh cada 30 segundos sin recargar la página (Alpine.js polling)
-- [ ] **DASH-05**: Frontend usa Tailwind CSS pre-compilado, Lucide icons inline SVG, Alpine.js, uPlot
+- [x] **DASH-05**: Frontend usa Tailwind CSS pre-compilado, Lucide icons inline SVG, Alpine.js, uPlot
 - [ ] **DASH-06**: El dashboard muestra hostname del VPS y timestamp de última actualización
 
 ### Alerting
@@ -138,11 +138,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | STOR-01 | Phase 8 | Pending |
 | STOR-02 | Phase 12 | Pending |
 | STOR-03 | Phase 8 | Complete |
-| DASH-01 | Phase 11 | Pending |
+| DASH-01 | Phase 11 | Complete |
 | DASH-02 | Phase 11 | Pending |
 | DASH-03 | Phase 11 | Pending |
 | DASH-04 | Phase 11 | Pending |
-| DASH-05 | Phase 11 | Pending |
+| DASH-05 | Phase 11 | Complete |
 | DASH-06 | Phase 11 | Pending |
 | ALRT-01 | Phase 8 | Complete |
 | ALRT-02 | Phase 9 | Complete |

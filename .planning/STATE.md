@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Métricas y Dashboard
-status: Ready to plan
-stopped_at: Completed 10-rest-api-y-cli-02-PLAN.md
-last_updated: "2026-03-27T12:41:40.952Z"
+status: Ready to execute
+stopped_at: Completed 11-dashboard-web-embedido-01-PLAN.md
+last_updated: "2026-03-28T21:42:08.289Z"
 progress:
   total_phases: 9
   completed_phases: 7
-  total_plans: 14
-  completed_plans: 14
+  total_plans: 16
+  completed_plans: 15
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** Every event that happens on the VPS gets reliably captured and delivered to Telegram — no notification is ever lost silently.
-**Current focus:** Phase 10 — rest-api-y-cli
+**Current focus:** Phase 11 — dashboard-web-embedido
 
 ## Current Position
 
-Phase: 11
-Plan: Not started
+Phase: 11 (dashboard-web-embedido) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -59,6 +59,7 @@ Plan: Not started
 | Phase 09-metrics-collector-y-alertas P02 | 10 | 2 tasks | 5 files |
 | Phase 10 P01 | 8 | 2 tasks | 4 files |
 | Phase 10-rest-api-y-cli P02 | 2 | 2 tasks | 3 files |
+| Phase 11 P01 | 8 | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -96,6 +97,9 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - [Phase 10]: IngestHandler usa status hardcodeado 'ok' — solo el evaluator evalua thresholds (D-10); escritura manual no interfiere con state machine de alertas
 - [Phase 10-rest-api-y-cli]: text/tabwriter en jaimito status: lipgloss/v2 table API no verificada en RESEARCH, tabwriter stdlib es mas seguro
 - [Phase 10-rest-api-y-cli]: GetMetrics sin auth header: endpoint publico per D-06 de investigacion de metricas
+- [Phase 11-01]: DashboardHandler lee HTML embedido una vez en creacion del handler via sync.OnceValue para hostname caching — no por request
+- [Phase 11-01]: GET /dashboard sin autenticacion — consistente con HealthHandler pattern (D-14)
+- [Phase 11-01]: Vendor libs en internal/web/vendor/ para uso inline en Plan 02 — no se embeden directamente aun
 
 ### Pending Todos
 
@@ -109,6 +113,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-27T12:36:37.954Z
-Stopped at: Completed 10-rest-api-y-cli-02-PLAN.md
+Last session: 2026-03-28T21:42:08.285Z
+Stopped at: Completed 11-dashboard-web-embedido-01-PLAN.md
 Resume file: None
