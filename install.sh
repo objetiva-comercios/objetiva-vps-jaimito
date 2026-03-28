@@ -40,6 +40,7 @@ SERVICE_NAME="jaimito"
 SERVICE_FILE="systemd/jaimito.service"
 HEALTH_URL="http://127.0.0.1:8080/api/v1/health"
 GO_MIN_VERSION="1.25"
+GO_INSTALL_VERSION="1.25.0"
 
 # -- Colores -----------------------------------------------------------------
 RED='\033[0;31m'
@@ -86,8 +87,8 @@ if [ "$GO_INSTALLED" = true ]; then
 fi
 
 if [ "$GO_INSTALLED" = false ]; then
-    GO_TAR="go${GO_MIN_VERSION}.1.linux-$(dpkg --print-architecture 2>/dev/null || echo amd64).tar.gz"
-    info "Instalando Go ${GO_MIN_VERSION}..."
+    GO_TAR="go${GO_INSTALL_VERSION}.linux-$(dpkg --print-architecture 2>/dev/null || echo amd64).tar.gz"
+    info "Instalando Go ${GO_INSTALL_VERSION}..."
     curl -sL "https://go.dev/dl/${GO_TAR}" | sudo tar -C /usr/local -xzf -
     export PATH=$PATH:/usr/local/go/bin
     if ! grep -q '/usr/local/go/bin' "$HOME/.bashrc" 2>/dev/null; then
