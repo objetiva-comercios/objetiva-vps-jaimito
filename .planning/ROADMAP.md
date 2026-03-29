@@ -187,4 +187,4 @@ Plans:
 | 9. Metrics Collector y Alertas | v2.0 | 0/2 | Planned    |  |
 | 10. REST API y CLI | v2.0 | 1/2 | Complete    | 2026-03-27 |
 | 11. Dashboard Web Embedido | v2.0 | 2/2 | Complete   | 2026-03-28 |
-| 12. Cleanup y Polish | v2.0 | 1/1 | Complete   | 2026-03-29 |
+| 12. Cleanup y Polish | v2.0 | 1/1 | Complete    | 2026-03-29 |
