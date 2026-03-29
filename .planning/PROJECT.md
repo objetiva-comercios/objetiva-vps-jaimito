@@ -34,6 +34,8 @@ Every event that happens on the VPS gets reliably captured and delivered to Tele
 - ✓ REST API for metrics (GET /api/v1/metrics, GET /api/v1/metrics/{name}/readings, POST /api/v1/metrics) — Validated in Phase 10: REST API y CLI
 - ✓ CLI `jaimito status` for metrics overview — Validated in Phase 10: REST API y CLI
 - ✓ CLI `jaimito metric` for manual metric ingestion — Validated in Phase 10: REST API y CLI
+- ✓ Automatic data retention with periodic purge of old readings — Validated in Phase 12: Cleanup y Polish
+- ✓ config.example.yaml documents all v2.0 metrics options — Validated in Phase 12: Cleanup y Polish
 
 ## Current Milestone: v2.0 Métricas y Dashboard
 
@@ -119,4 +121,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-27 — Phase 10 complete: REST API de métricas + CLI status/metric implementados.*
+*Last updated: 2026-03-29 — Phase 12 complete: Purga automática de readings + config.example.yaml documentado para v2.0. Milestone v2.0 completo.*
