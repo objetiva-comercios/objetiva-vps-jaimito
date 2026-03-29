@@ -81,8 +81,14 @@ func runServe(cmd *cobra.Command, args []string) error {
 	// 10. Start dispatcher — polls for queued messages every 1s, delivers via Telegram.
 	dispatcher.Start(ctx, database, tgBot, cfg)
 
-	// 11. Start cleanup scheduler — purges old messages in background goroutine.
-	cleanup.Start(ctx, database, 24*time.Hour)
+	// 11. Start cleanup scheduler — purges old messages and metric readings in background goroutine.
+	var metricsRetention time.Duration
+	if cfg.Metrics != nil && cfg.Metrics.Retention != "" {
+		if d, err := config.ParseDuration(cfg.Metrics.Retention); err == nil {
+			metricsRetention = d
+		}
+	}
+	cleanup.Start(ctx, database, 24*time.Hour, metricsRetention)
 
 	// 12. Start metrics collector — optional, only if metrics section is configured (D-02).
 	if cfg.Metrics != nil {

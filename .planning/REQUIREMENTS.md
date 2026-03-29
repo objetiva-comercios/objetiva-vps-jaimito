@@ -47,7 +47,7 @@ Requirements for Métricas y Dashboard milestone. Each maps to roadmap phases.
 ### Storage
 
 - [ ] **STOR-01**: Los readings se almacenan en tabla metric_readings (SQLite) con metric_name, value, recorded_at
-- [ ] **STOR-02**: Purga automática de readings mayores a 7 días (reutiliza patrón de cleanup existente)
+- [x] **STOR-02**: Purga automática de readings mayores a 7 días (reutiliza patrón de cleanup existente)
 - [x] **STOR-03**: La sección metrics en config.yaml define retention y alert_cooldown globales
 
 ### Dashboard
@@ -136,7 +136,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MCOL-04 | Phase 9 | Complete |
 | MCOL-05 | Phase 9 | Complete |
 | STOR-01 | Phase 8 | Pending |
-| STOR-02 | Phase 12 | Pending |
+| STOR-02 | Phase 12 | Complete |
 | STOR-03 | Phase 8 | Complete |
 | DASH-01 | Phase 11 | Complete |
 | DASH-02 | Phase 11 | Complete |

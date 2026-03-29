@@ -1,4 +1,4 @@
-// Package cleanup provides periodic purging of old messages from the database.
+// Package cleanup provides periodic purging of old messages and metric readings from the database.
 package cleanup
 
 import (
@@ -6,16 +6,24 @@ import (
 	"database/sql"
 	"log/slog"
 	"time"
+
+	dbpkg "github.com/chiguire/jaimito/internal/db"
 )
 
 // Start launches the cleanup scheduler. It runs an initial purge immediately,
 // then repeats every interval. Stops cleanly when ctx is cancelled.
 // interval is typically 24*time.Hour for production use.
-func Start(ctx context.Context, db *sql.DB, interval time.Duration) {
+// metricsRetention, if > 0, enables periodic purging of metric_readings older than that duration.
+func Start(ctx context.Context, db *sql.DB, interval time.Duration, metricsRetention time.Duration) {
 	// Run immediately on startup so cleanup happens even if service rarely restarts.
 	// Per RESEARCH.md recommendation: startup-then-interval pattern.
 	if err := purgeOldMessages(ctx, db); err != nil {
 		slog.Error("initial cleanup failed", "error", err)
+	}
+	if metricsRetention > 0 {
+		if err := purgeMetrics(ctx, db, metricsRetention); err != nil {
+			slog.Error("initial metrics cleanup failed", "error", err)
+		}
 	}
 
 	ticker := time.NewTicker(interval)
@@ -26,6 +34,11 @@ func Start(ctx context.Context, db *sql.DB, interval time.Duration) {
 			case <-ticker.C:
 				if err := purgeOldMessages(ctx, db); err != nil {
 					slog.Error("cleanup failed", "error", err)
+				}
+				if metricsRetention > 0 {
+					if err := purgeMetrics(ctx, db, metricsRetention); err != nil {
+						slog.Error("metrics cleanup failed", "error", err)
+					}
 				}
 			case <-ctx.Done():
 				return
@@ -76,5 +89,17 @@ func purgeOldMessages(ctx context.Context, db *sql.DB) error {
 		slog.Info("purged old messages", "count", deleted)
 	}
 
+	return nil
+}
+
+// purgeMetrics deletes metric_readings older than retention duration.
+func purgeMetrics(ctx context.Context, db *sql.DB, retention time.Duration) error {
+	deleted, err := dbpkg.PurgeOldReadings(ctx, db, retention)
+	if err != nil {
+		return err
+	}
+	if deleted > 0 {
+		slog.Info("purged old metric readings", "count", deleted)
+	}
 	return nil
 }
