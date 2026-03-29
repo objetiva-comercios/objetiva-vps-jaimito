@@ -42,63 +42,68 @@ body { font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberati
                     <th class="text-xs text-slate-500 uppercase tracking-wider text-left py-2 px-3">Estado</th>
                 </tr>
             </thead>
-            <tbody>
-                <template x-for="metric in metrics" :key="metric.name">
-                    <!-- Data row -->
-                    <tr
-                        @click="toggleMetric(metric.name, metric.thresholds)"
-                        class="border-b border-slate-700 cursor-pointer transition-colors duration-150 hover:bg-slate-800"
-                        :class="{ 'bg-slate-800 border-l-2 border-blue-500': openMetric === metric.name }"
-                    >
-                        <td class="py-3 px-3">
-                            <span class="text-sm font-semibold text-slate-100" x-text="metric.name"></span>
-                        </td>
-                        <td class="py-3 px-3">
-                            <div>
-                                <span class="text-base font-semibold" x-text="metric.last_value !== null ? metric.last_value : '—'"></span>
-                                <div class="text-xs text-slate-500" x-text="metric.updated_at ? new Date(metric.updated_at).toLocaleTimeString('es-AR', {hour12: false}) : ''"></div>
-                            </div>
-                        </td>
-                        <td class="py-3 px-3">
-                            <svg width="80" height="24" viewBox="0 0 80 24" x-show="sparklinePoints(metric.name) !== ''">
-                                <polyline :points="sparklinePoints(metric.name)" stroke="#94a3b8" stroke-width="1.5" fill="none"/>
-                            </svg>
-                            <span x-show="sparklinePoints(metric.name) === ''" class="text-xs text-slate-600">—</span>
-                        </td>
-                        <td class="py-3 px-3">
-                            <div class="flex items-center gap-1.5">
-                                <span
-                                    class="inline-block w-2 h-2 rounded-full"
-                                    :class="{
-                                        'bg-green-500': metric.last_status === 'ok',
-                                        'bg-yellow-500': metric.last_status === 'warning',
-                                        'bg-red-500 animate-pulse': metric.last_status === 'critical'
-                                    }"
-                                ></span>
-                                <span
-                                    class="text-xs"
-                                    :class="{
-                                        'text-green-500': metric.last_status === 'ok',
-                                        'text-yellow-500': metric.last_status === 'warning',
-                                        'text-red-500': metric.last_status === 'critical'
-                                    }"
-                                    x-text="metric.last_status || 'ok'"
-                                ></span>
-                            </div>
-                        </td>
-                    </tr>
-                    <!-- Expanded chart row -->
-                    <tr x-show="openMetric === metric.name" x-transition>
-                        <td colspan="4" class="bg-slate-800 p-4">
-                            <div
-                                :id="'chart-' + metric.name"
-                                class="min-h-[200px] md:min-h-[300px] w-full"
-                                style="min-height: 200px;"
-                            ></div>
-                        </td>
-                    </tr>
-                </template>
-            </tbody>
+            <template x-for="cat in categories" :key="cat">
+                <tbody>
+                    <tr><td colspan="4" class="pt-5 pb-1 px-3"><span class="text-xs font-semibold text-slate-500 uppercase tracking-wider" x-text="categoryLabel(cat)"></span></td></tr>
+                    <template x-for="metric in metricsForCategory(cat)" :key="metric.name">
+                        <!-- Data row -->
+                        <tr
+                            @click="toggleMetric(metric.name, metric.thresholds)"
+                            class="border-b border-slate-700 cursor-pointer transition-colors duration-150 hover:bg-slate-800"
+                            :class="{ 'bg-slate-800 border-l-2 border-blue-500': openMetric === metric.name }"
+                        >
+                            <td class="py-3 px-3">
+                                <span class="text-sm font-semibold text-slate-100" x-text="metric.name"></span>
+                                <div class="text-slate-600" style="font-size:0.65rem;line-height:1.2;margin-top:2px" x-text="descriptionFor(metric.name)"></div>
+                            </td>
+                            <td class="py-3 px-3">
+                                <div>
+                                    <span class="text-base font-semibold" x-text="metric.last_value !== null ? metric.last_value : '—'"></span>
+                                    <div class="text-xs text-slate-500" x-text="metric.updated_at ? new Date(metric.updated_at).toLocaleTimeString('es-AR', {hour12: false}) : ''"></div>
+                                </div>
+                            </td>
+                            <td class="py-3 px-3">
+                                <svg width="80" height="24" viewBox="0 0 80 24" x-show="sparklinePoints(metric.name) !== ''">
+                                    <polyline :points="sparklinePoints(metric.name)" stroke="#94a3b8" stroke-width="1.5" fill="none"/>
+                                </svg>
+                                <span x-show="sparklinePoints(metric.name) === ''" class="text-xs text-slate-600">—</span>
+                            </td>
+                            <td class="py-3 px-3">
+                                <div class="flex items-center gap-1.5">
+                                    <span
+                                        class="inline-block w-2 h-2 rounded-full"
+                                        :class="{
+                                            'bg-green-500': metric.last_status === 'ok',
+                                            'bg-yellow-500': metric.last_status === 'warning',
+                                            'bg-red-500 animate-pulse': metric.last_status === 'critical'
+                                        }"
+                                    ></span>
+                                    <span
+                                        class="text-xs"
+                                        :class="{
+                                            'text-green-500': metric.last_status === 'ok',
+                                            'text-yellow-500': metric.last_status === 'warning',
+                                            'text-red-500': metric.last_status === 'critical'
+                                        }"
+                                        x-text="metric.last_status || 'ok'"
+                                    ></span>
+                                    <span x-show="metric.thresholds" class="text-xs text-slate-600" x-text="metric.thresholds ? '(w:' + (metric.thresholds.warning ?? '—') + ' c:' + (metric.thresholds.critical ?? '—') + ')' : ''"></span>
+                                </div>
+                            </td>
+                        </tr>
+                        <!-- Expanded chart row -->
+                        <tr x-show="openMetric === metric.name" x-transition>
+                            <td colspan="4" class="bg-slate-800 p-4">
+                                <div
+                                    :id="'chart-' + metric.name"
+                                    class="min-h-[200px] md:min-h-[300px] w-full"
+                                    style="min-height: 200px;"
+                                ></div>
+                            </td>
+                        </tr>
+                    </template>
+                </tbody>
+            </template>
         </table>
 
         <!-- Loading skeleton -->
@@ -184,6 +189,41 @@ function makeThresholdPlugin(thresholds) {
     };
 }
 
+const metricDescriptions = {
+    disk_root: 'Uso del disco raíz (%)',
+    ram_used: 'Memoria RAM utilizada (%)',
+    swap_used: 'Espacio swap utilizado (%)',
+    cpu_load: 'Load average (1 min)',
+    uptime_days: 'Días de uptime',
+    open_files: 'File descriptors abiertos',
+    zombie_procs: 'Procesos zombie',
+    docker_running: 'Contenedores activos',
+    docker_stopped: 'Contenedores detenidos',
+    pg_connections: 'Conexiones activas a PostgreSQL',
+    pg_size_crm_mb: 'Base crm_talleres (MB)',
+    pg_size_admin_mb: 'Base admin_base_sanchez (MB)',
+    pg_dead_tuples: 'Tuplas muertas (pendientes VACUUM)',
+    pg_cache_hit_pct: 'Cache hit ratio (%)',
+    redis_memory_mb: 'Memoria Redis (MB)',
+    redis_keys: 'Total keys en Redis',
+    redis_clients: 'Clientes conectados a Redis',
+    traefik_healthy: 'Reverse proxy (1=ok, 0=down)',
+    postgrest_healthy: 'API PostgREST (1=ok, 0=down)',
+    jaimito_healthy: 'Servicio jaimito (1=ok, 0=down)',
+    jaimito_db_size_mb: 'Base SQLite jaimito (MB)',
+    openclaw_healthy: 'Gateway OpenClaw (1=ok, 0=down)',
+    openclaw_mem_mb: 'Memoria OpenClaw (MB)',
+    tailscale_peers: 'Peers online en Tailscale',
+};
+
+const categoryLabels = {
+    system: '💻 Sistema', docker: '🐳 Docker', postgres: '🐘 PostgreSQL',
+    redis: '⚡ Redis', traefik: '🔀 Traefik', talleres: '🏭 Talleres',
+    jaimito: '🤖 Jaimito', openclaw: '🧠 OpenClaw', network: '🌐 Red',
+};
+
+const categoryOrder = ['system', 'docker', 'postgres', 'redis', 'traefik', 'talleres', 'jaimito', 'openclaw', 'network'];
+
 document.addEventListener('alpine:init', () => {
     Alpine.data('dashboard', () => ({
         metrics: [],
@@ -197,6 +237,7 @@ document.addEventListener('alpine:init', () => {
 
         async init() {
             await this.fetchMetrics();
+            await this.seedSparkData();
             this._pollingTimer = setInterval(() => this.fetchMetrics(), 30000);
         },
 
@@ -230,6 +271,38 @@ document.addEventListener('alpine:init', () => {
             } finally {
                 this.loading = false;
             }
+        },
+
+        async seedSparkData() {
+            for (const metric of this.metrics) {
+                try {
+                    const resp = await fetch(`/api/v1/metrics/${metric.name}/readings?since=1h`);
+                    if (!resp.ok) continue;
+                    const data = await resp.json();
+                    if (data.readings && data.readings.length > 0) {
+                        this.sparkData[metric.name] = data.readings.slice(-20).map(r => r.value);
+                    }
+                } catch(e) { /* silent */ }
+            }
+        },
+
+        get categories() {
+            const present = new Set(this.metrics.map(m => m.category));
+            return categoryOrder.filter(c => present.has(c)).concat(
+                [...present].filter(c => !categoryOrder.includes(c))
+            );
+        },
+
+        metricsForCategory(cat) {
+            return this.metrics.filter(m => m.category === cat);
+        },
+
+        categoryLabel(cat) {
+            return categoryLabels[cat] || cat;
+        },
+
+        descriptionFor(name) {
+            return metricDescriptions[name] || '';
         },
 
         async toggleMetric(name, thresholds) {
