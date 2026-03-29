@@ -5,7 +5,8 @@ database:
   path: "/var/lib/jaimito/jaimito.db"
 
 server:
-  # Listen address for the HTTP API (default: 127.0.0.1:8080)
+  # Listen address for the HTTP API and dashboard (default: 127.0.0.1:8080)
+  # Access the dashboard at http://127.0.0.1:8080/dashboard
   listen: "127.0.0.1:8080"
 
 channels:
@@ -43,20 +44,25 @@ seed_api_keys:
   - name: "default"
     key: "sk-REPLACE_ME_WITH_A_REAL_KEY"
 
-# Metrics collection — optional. Remove this section to disable metrics entirely.
+# Metrics collection (v2.0) — optional. Remove this section to disable metrics entirely.
+# When enabled, jaimito collects metrics at regular intervals, stores them in SQLite,
+# serves them via the REST API, and displays them in the dashboard at /dashboard.
+# Threshold crossings trigger Telegram alerts to the 'monitoring' or 'general' channel.
+#
 # metrics:
-#   retention: "7d"            # How long to keep readings (supports: s, m, h, d)
-#   alert_cooldown: "30m"      # Minimum time between alerts for the same metric
-#   collect_interval: "60s"    # Default collection interval (overridden per metric)
+#   retention: "7d"            # How long to keep readings (supports: s, m, h, d). Default: 7d.
+#   alert_cooldown: "30m"      # Minimum time between repeated alerts for the same metric. Default: 30m.
+#   collect_interval: "60s"    # Default collection interval for all metrics (overridden per-metric).
 #   definitions:
-#     - name: disk_root
-#       command: "df / | awk 'NR==2 {print $5}' | tr -d '%'"
-#       interval: "300s"
-#       category: system
-#       type: gauge
-#       thresholds:
-#         warning: 80
-#         critical: 90
+#     # --- Predefined system metrics ---
+#     - name: disk_root          # Unique identifier (used in API and dashboard)
+#       command: "df / | awk 'NR==2 {print $5}' | tr -d '%'"  # Shell command; stdout parsed as float64
+#       interval: "300s"         # Optional: per-metric interval (inherits collect_interval if omitted)
+#       category: system         # Category label: system, docker, or any custom string
+#       type: gauge              # Metric type: gauge (point-in-time) or counter (monotonically increasing)
+#       thresholds:              # Optional: omit to collect without alerts
+#         warning: 80            # Alert when value >= warning (Telegram warning message)
+#         critical: 90           # Alert when value >= critical (Telegram critical message)
 #
 #     - name: ram_used
 #       command: "free | awk '/^Mem:/ {printf \"%.0f\", $3/$2*100}'"
@@ -72,15 +78,33 @@ seed_api_keys:
 #       interval: "60s"
 #       category: system
 #       type: gauge
+#       # No thresholds — collected for visibility only, no alerts
 #
 #     - name: docker_running
 #       command: "docker ps -q | wc -l | tr -d ' '"
 #       interval: "120s"
 #       category: docker
 #       type: gauge
+#       # Fails silently if Docker is not installed; other metrics are unaffected
 #
 #     - name: uptime_days
 #       command: "awk '{printf \"%.1f\", $1/86400}' /proc/uptime"
 #       interval: "3600s"
 #       category: system
 #       type: counter
+#
+#     # --- Custom metric examples ---
+#     - name: pg_connections
+#       command: "psql -U postgres -tAc 'SELECT count(*) FROM pg_stat_activity'"
+#       interval: "120s"
+#       category: postgres
+#       type: gauge
+#       thresholds:
+#         warning: 80
+#         critical: 100
+#
+#     - name: nginx_workers
+#       command: "pgrep -c nginx || echo 0"
+#       interval: "60s"
+#       category: nginx
+#       type: gauge
