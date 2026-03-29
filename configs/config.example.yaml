@@ -54,15 +54,15 @@ seed_api_keys:
 #   alert_cooldown: "30m"      # Minimum time between repeated alerts for the same metric. Default: 30m.
 #   collect_interval: "60s"    # Default collection interval for all metrics (overridden per-metric).
 #   definitions:
-#     # --- Predefined system metrics ---
-#     - name: disk_root          # Unique identifier (used in API and dashboard)
-#       command: "df / | awk 'NR==2 {print $5}' | tr -d '%'"  # Shell command; stdout parsed as float64
-#       interval: "300s"         # Optional: per-metric interval (inherits collect_interval if omitted)
-#       category: system         # Category label: system, docker, or any custom string
-#       type: gauge              # Metric type: gauge (point-in-time) or counter (monotonically increasing)
-#       thresholds:              # Optional: omit to collect without alerts
-#         warning: 80            # Alert when value >= warning (Telegram warning message)
-#         critical: 90           # Alert when value >= critical (Telegram critical message)
+#     # ---------- SYSTEM ----------
+#     - name: disk_root
+#       command: "df / | awk 'NR==2 {print $5}' | tr -d '%'"
+#       interval: "300s"
+#       category: system
+#       type: gauge
+#       thresholds:
+#         warning: 80
+#         critical: 90
 #
 #     - name: ram_used
 #       command: "free | awk '/^Mem:/ {printf \"%.0f\", $3/$2*100}'"
@@ -73,19 +73,21 @@ seed_api_keys:
 #         warning: 80
 #         critical: 95
 #
+#     - name: swap_used
+#       command: "free | awk '/^Swap:/ {if($2>0) printf \"%.0f\", $3/$2*100; else print 0}'"
+#       interval: "300s"
+#       category: system
+#       type: gauge
+#       thresholds:
+#         warning: 50
+#         critical: 80
+#
 #     - name: cpu_load
-#       command: "uptime | awk -F'load average:' '{print $2}' | awk -F',' '{print $1}' | tr -d ' '"
+#       command: "cat /proc/loadavg | awk '{print $1}'"
 #       interval: "60s"
 #       category: system
 #       type: gauge
-#       # No thresholds — collected for visibility only, no alerts
-#
-#     - name: docker_running
-#       command: "docker ps -q | wc -l | tr -d ' '"
-#       interval: "120s"
-#       category: docker
-#       type: gauge
-#       # Fails silently if Docker is not installed; other metrics are unaffected
+#       # Threshold depends on number of CPUs — adjust to your vCPU count
 #
 #     - name: uptime_days
 #       command: "awk '{printf \"%.1f\", $1/86400}' /proc/uptime"
@@ -93,9 +95,45 @@ seed_api_keys:
 #       category: system
 #       type: counter
 #
-#     # --- Custom metric examples ---
+#     - name: open_files
+#       command: "cat /proc/sys/fs/file-nr | awk '{print $1}'"
+#       interval: "300s"
+#       category: system
+#       type: gauge
+#       thresholds:
+#         warning: 50000
+#         critical: 80000
+#
+#     - name: zombie_procs
+#       command: "ps aux | awk '{if($8==\"Z\") count++} END {print count+0}'"
+#       interval: "300s"
+#       category: system
+#       type: gauge
+#       thresholds:
+#         warning: 3
+#         critical: 10
+#
+#     # ---------- DOCKER ----------
+#     - name: docker_running
+#       command: "docker ps -q | wc -l | tr -d ' '"
+#       interval: "120s"
+#       category: docker
+#       type: gauge
+#       thresholds:
+#         warning: 5    # Alert if fewer than expected (normally 7 containers)
+#
+#     - name: docker_stopped
+#       command: "docker ps -aq --filter status=exited | wc -l | tr -d ' '"
+#       interval: "300s"
+#       category: docker
+#       type: gauge
+#       thresholds:
+#         warning: 1
+#         critical: 3
+#
+#     # ---------- POSTGRESQL (pgvector:pg17) ----------
 #     - name: pg_connections
-#       command: "psql -U postgres -tAc 'SELECT count(*) FROM pg_stat_activity'"
+#       command: "docker exec postgres psql -U sanchez -tAc 'SELECT count(*) FROM pg_stat_activity'"
 #       interval: "120s"
 #       category: postgres
 #       type: gauge
@@ -103,8 +141,105 @@ seed_api_keys:
 #         warning: 80
 #         critical: 100
 #
-#     - name: nginx_workers
-#       command: "pgrep -c nginx || echo 0"
+#     - name: pg_size_crm_mb
+#       command: "docker exec postgres psql -U sanchez -tAc \"SELECT pg_database_size('crm_talleres')/1048576\""
+#       interval: "3600s"
+#       category: postgres
+#       type: gauge
+#
+#     - name: pg_size_admin_mb
+#       command: "docker exec postgres psql -U sanchez -tAc \"SELECT pg_database_size('admin_base_sanchez')/1048576\""
+#       interval: "3600s"
+#       category: postgres
+#       type: gauge
+#
+#     - name: pg_dead_tuples
+#       command: "docker exec postgres psql -U sanchez -tAc 'SELECT COALESCE(sum(n_dead_tup),0) FROM pg_stat_user_tables'"
+#       interval: "600s"
+#       category: postgres
+#       type: gauge
+#       thresholds:
+#         warning: 10000
+#         critical: 50000
+#
+#     - name: pg_cache_hit_pct
+#       command: "docker exec postgres psql -U sanchez -tAc 'SELECT CASE WHEN blks_hit+blks_read=0 THEN 100 ELSE round(blks_hit*100.0/(blks_hit+blks_read),1) END FROM pg_stat_database WHERE datname=current_database()'"
+#       interval: "300s"
+#       category: postgres
+#       type: gauge
+#
+#     # ---------- REDIS (redis:7-alpine) ----------
+#     # NOTE: Replace REDIS_PASSWORD with your actual redis password
+#     - name: redis_memory_mb
+#       command: "docker exec redis redis-cli -a REDIS_PASSWORD INFO memory 2>/dev/null | grep used_memory: | awk -F: '{printf \"%.1f\", $2/1048576}'"
+#       interval: "120s"
+#       category: redis
+#       type: gauge
+#
+#     - name: redis_keys
+#       command: "docker exec redis redis-cli -a REDIS_PASSWORD DBSIZE 2>/dev/null | awk -F: '{print $2}'"
+#       interval: "300s"
+#       category: redis
+#       type: gauge
+#
+#     - name: redis_clients
+#       command: "docker exec redis redis-cli -a REDIS_PASSWORD INFO clients 2>/dev/null | grep connected_clients: | awk -F: '{print $2}' | tr -d '\\r'"
+#       interval: "120s"
+#       category: redis
+#       type: gauge
+#       thresholds:
+#         warning: 50
+#         critical: 100
+#
+#     # ---------- TRAEFIK ----------
+#     - name: traefik_healthy
+#       command: "curl -sf http://100.87.113.34:80/ > /dev/null && echo 1 || echo 0"
+#       interval: "120s"
+#       category: traefik
+#       type: gauge
+#
+#     # ---------- POSTGREST (talleres API) ----------
+#     - name: postgrest_healthy
+#       command: "curl -sf http://127.0.0.1:3000/ > /dev/null && echo 1 || echo 0"
+#       interval: "120s"
+#       category: talleres
+#       type: gauge
+#
+#     # ---------- JAIMITO (self-monitoring) ----------
+#     - name: jaimito_healthy
+#       command: "curl -sf http://127.0.0.1:8080/api/v1/health > /dev/null && echo 1 || echo 0"
 #       interval: "60s"
-#       category: nginx
+#       category: jaimito
+#       type: gauge
+#
+#     - name: jaimito_db_size_mb
+#       command: "du -m /var/lib/jaimito/jaimito.db | awk '{print $1}'"
+#       interval: "3600s"
+#       category: jaimito
+#       type: gauge
+#       thresholds:
+#         warning: 100
+#         critical: 500
+#
+#     # ---------- OPENCLAW ----------
+#     - name: openclaw_healthy
+#       command: "curl -sf http://127.0.0.1:18789/ > /dev/null && echo 1 || echo 0"
+#       interval: "120s"
+#       category: openclaw
+#       type: gauge
+#
+#     - name: openclaw_mem_mb
+#       command: "ps -C node -o rss= | awk '{sum+=$1} END {printf \"%.0f\", sum/1024}'"
+#       interval: "300s"
+#       category: openclaw
+#       type: gauge
+#       thresholds:
+#         warning: 500
+#         critical: 800
+#
+#     # ---------- TAILSCALE ----------
+#     - name: tailscale_peers
+#       command: "tailscale status --json 2>/dev/null | grep -c '\"Online\":true' || echo 0"
+#       interval: "600s"
+#       category: network
 #       type: gauge
