@@ -35,7 +35,7 @@
 - [ ] **Phase 9: Metrics Collector y Alertas** — jaimito recolecta métricas del sistema de forma autónoma a intervalos configurables y envía alertas a Telegram cuando se cruzan umbrales
 - [x] **Phase 10: REST API y CLI** — El operador puede consultar métricas actuales e históricas via API y terminal, e ingestar métricas manuales desde scripts (completed 2026-03-27)
 - [ ] **Phase 11: Dashboard Web Embedido** — El operador puede abrir el dashboard en un browser y ver todas las métricas con gráficos expandibles y auto-refresh
-- [ ] **Phase 12: Cleanup y Polish** — La retención de datos se aplica automáticamente y la configuración de ejemplo documenta todas las opciones de v2.0
+- [x] **Phase 12: Cleanup y Polish** — La retención de datos se aplica automáticamente y la configuración de ejemplo documenta todas las opciones de v2.0 (completed 2026-03-29)
 
 ## Phase Details
 
@@ -187,4 +187,4 @@ Plans:
 | 9. Metrics Collector y Alertas | v2.0 | 0/2 | Planned    |  |
 | 10. REST API y CLI | v2.0 | 1/2 | Complete    | 2026-03-27 |
 | 11. Dashboard Web Embedido | v2.0 | 1/2 | In Progress|  |
-| 12. Cleanup y Polish | v2.0 | 0/? | Not started | - |
+| 12. Cleanup y Polish | v2.0 | 1/1 | Complete   | 2026-03-29 |
