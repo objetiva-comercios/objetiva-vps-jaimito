@@ -43,7 +43,20 @@ Ejecutar sin subcomando inicia el servidor daemon.`,
   # Gestionar API keys
   jaimito keys create --name mi-servicio
   jaimito keys list
-  jaimito keys revoke <id>`,
+  jaimito keys revoke <id>
+
+  # --- Metricas y monitoreo ---
+  # Para activar metricas, agregar la seccion 'metrics' en config.yaml:
+  #   sudo nano /etc/jaimito/config.yaml
+  # Copiar el bloque de ejemplo desde configs/config.example.yaml del repo.
+  # Reiniciar despues de cambiar config: sudo systemctl restart jaimito
+  #
+  # Ver metricas recolectadas:
+  jaimito status
+  # Dashboard web:
+  #   http://127.0.0.1:8080/dashboard
+  # Ingestar metrica manual:
+  jaimito metric -n disk_root --value 85.5`,
 	// Bare `jaimito` with no subcommand starts the server daemon.
 	RunE:          runServe,
 	SilenceUsage:  true,

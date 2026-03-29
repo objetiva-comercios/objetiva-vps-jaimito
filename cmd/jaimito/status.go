@@ -39,7 +39,27 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(metrics) == 0 {
-		fmt.Println("No metrics found")
+		fmt.Println("No metrics configured.")
+		fmt.Println("")
+		fmt.Println("Para activar metricas, agregar la seccion 'metrics' en config.yaml:")
+		fmt.Println("  sudo nano /etc/jaimito/config.yaml")
+		fmt.Println("")
+		fmt.Println("Ejemplo minimo:")
+		fmt.Println("  metrics:")
+		fmt.Println("    retention: \"7d\"")
+		fmt.Println("    alert_cooldown: \"30m\"")
+		fmt.Println("    collect_interval: \"60s\"")
+		fmt.Println("    definitions:")
+		fmt.Println("      - name: disk_root")
+		fmt.Println("        command: \"df / | awk 'NR==2 {print $5}' | tr -d '%'\"")
+		fmt.Println("        category: system")
+		fmt.Println("        type: gauge")
+		fmt.Println("        thresholds:")
+		fmt.Println("          warning: 80")
+		fmt.Println("          critical: 90")
+		fmt.Println("")
+		fmt.Println("Ver mas ejemplos en: configs/config.example.yaml del repositorio.")
+		fmt.Println("Reiniciar despues de cambiar config: sudo systemctl restart jaimito")
 		return nil
 	}
 
