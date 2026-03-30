@@ -365,4 +365,4 @@ Ver [DEPLOY.md](DEPLOY.md) para documentacion completa de deploy, troubleshootin
 
 - **v1.0 MVP** — completado (notificaciones, CLI, Telegram dispatch)
 - **v1.1 Setup Wizard** — completado (wizard interactivo con validacion Telegram)
-- **v2.0 Metricas y Dashboard** — en progreso (15 de 16 planes completados, fase 11 en ejecucion)
+- **v2.0 Metricas y Dashboard** — completado (metricas, alertas, state machine, REST API, CLI, dashboard web embedido)

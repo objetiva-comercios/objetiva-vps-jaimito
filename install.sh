@@ -9,7 +9,7 @@
 #   bash install.sh
 #
 # Que hace:
-#   1. Verifica dependencias (git, go 1.24+)
+#   1. Verifica dependencias (git, Go 1.25+)
 #   2. Clona o actualiza el repositorio
 #   3. Compila el binario Go
 #   4. Instala en /usr/local/bin/jaimito

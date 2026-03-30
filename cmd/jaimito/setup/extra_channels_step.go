@@ -125,6 +125,7 @@ func (s *ExtraChannelsStep) Init(data *SetupData) tea.Cmd {
 	}
 
 	s.state = stateAskAdd
+	s.confirmOption = 1 // default "No" — canales extra son opcionales
 	return nil
 }
 
